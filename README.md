@@ -46,11 +46,10 @@ docker compose up --build
 
 | Переменная | Назначение | Пример |
 |---|---|---|
-| `MAX_BOT_TOKEN` | Токен чат-бота MAX (**секрет, не коммитить**) | `xxxxx...` |
-| `MAX_API_BASE_URL` | Базовый адрес Bot API MAX | `https://platform-api2.max.ru` |
-| `REQUESTS_CA_BUNDLE` | Путь к CA-бандлу с сертификатами Минцифры | `/app/certs/ca-bundle.pem` |
-| `API_PORT` | Порт backend API | `8000` |
-| `DATA_FILE` | Путь к файлу датасета | `app/data/kazan.json` |
+| `MAX_BOT_TOKEN` | Токен чат-бота MAX (**секрет, не коммитить**) |
+| `MAX_API_BASE_URL` | Базовый адрес Bot API MAX |
+| `REQUESTS_CA_BUNDLE` | Путь к CA-бандлу с сертификатами Минцифры |
+| `API_PORT` | Порт backend API |
 
 ## 7. Используемые порты
 
