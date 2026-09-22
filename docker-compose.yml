@@ -1,0 +1,11 @@
+services:
+  bot:
+    build: ./backend
+    command: python app/main.py
+    env_file: .env
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:80"
