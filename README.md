@@ -25,6 +25,31 @@
 
 Поток: `MAX → бот → мини-приложение → API /route → датасет`.
 
+## Структура
+
+max-time-guide/
+├── backend/                  # Python: FastAPI (API маршрута) + бот
+│   ├── app/
+│   │   ├── main.py           # точка входа FastAPI
+│   │   ├── config.py         # чтение переменных окружения
+│   │   ├── api/routes.py     # эндпоинт /route
+│   │   ├── core/planner.py   # алгоритм подбора маршрута
+│   │   ├── bot/bot.py        # логика чат-бота MAX
+│   │   ├── models/schemas.py # pydantic-схемы
+│   ├── tests/
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   └── .env.example
+├── frontend/                 # React + Vite + MAX UI (мини-приложение)
+│   ├── src/
+│   ├── package.json
+│   ├── package-lock.json
+│   └── Dockerfile
+├── compose.yaml              # поднимает всё одной командой
+├── .dockerignore
+├── .gitignore
+└── README.md
+
 ## Запуск (Docker, одна команда)
 
 ```bash
