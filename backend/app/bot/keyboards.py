@@ -15,5 +15,5 @@ def get_location():
 
 def open_route():
     return [
-        [buttons.LinkButton("Собрать маршрут", "https://max-time-guide.ovoaookaaooaoa.workers.dev")],
+        [buttons.LinkButton("Собрать маршрут", "https://168.113.157.47.sslip.io")],
     ]
