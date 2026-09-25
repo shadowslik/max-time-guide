@@ -6,6 +6,14 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      # Ключи Яндекс.Карт нужны Vite во время сборки — env_file здесь не поможет,
+      # он задаёт переменные уже запущенному контейнеру. Значения берутся
+      # из корневого .env, которым и так пользуется бот.
+      args:
+        VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
+        VITE_YANDEX_ROUTER_API_KEY: ${VITE_YANDEX_ROUTER_API_KEY:-}
     ports:
       - "8080:80"
+    restart: unless-stopped

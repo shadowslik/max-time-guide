@@ -1,0 +1,139 @@
+/* Движение. Один набор кривых и длительностей на всё приложение,
+   чтобы экраны, шторки и мелкие элементы ощущались как одна система. */
+
+:root {
+  /* Кривая «как в нативных приложениях»: быстрый старт, мягкое торможение. */
+  --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --t-screen: 320ms;
+  --t-sheet: 300ms;
+  --t-item: 380ms;
+}
+
+/* ── Переходы между экранами ───────────────────────────────── */
+
+.stack { position: relative; height: 100%; overflow: hidden; }
+
+.stack__layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  will-change: transform, opacity;
+}
+.stack__layer--leaving { pointer-events: none; }
+
+.stack__layer--push-in { animation: layer-in-right var(--t-screen) var(--ease-out) both; z-index: 2; }
+.stack__layer--push-out { animation: layer-out-left var(--t-screen) var(--ease-out) both; z-index: 1; }
+.stack__layer--pop-in { animation: layer-in-left var(--t-screen) var(--ease-out) both; z-index: 1; }
+.stack__layer--pop-out { animation: layer-out-right var(--t-screen) var(--ease-out) both; z-index: 2; }
+
+@keyframes layer-in-right {
+  from { transform: translate3d(100%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+@keyframes layer-out-left {
+  from { transform: translate3d(0, 0, 0); opacity: 1; }
+  to { transform: translate3d(-26%, 0, 0); opacity: 0.55; }
+}
+@keyframes layer-in-left {
+  from { transform: translate3d(-26%, 0, 0); opacity: 0.55; }
+  to { transform: translate3d(0, 0, 0); opacity: 1; }
+}
+@keyframes layer-out-right {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(100%, 0, 0); }
+}
+
+/* ── Модальные шторки поверх экрана ────────────────────────── */
+
+.overlay { position: absolute; inset: 0; z-index: 10; }
+.overlay .scrim { animation: fade-in var(--t-sheet) ease both; }
+.overlay .sheet { animation: sheet-up var(--t-sheet) var(--ease-out) both; }
+.overlay--leaving { pointer-events: none; }
+.overlay--leaving .scrim { animation: fade-in var(--t-sheet) ease both reverse; }
+.overlay--leaving .sheet { animation: sheet-up var(--t-sheet) var(--ease-out) both reverse; }
+
+@keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sheet-up {
+  from { transform: translate3d(0, 100%, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+/* ── Появление содержимого ─────────────────────────────────── */
+
+.rise { animation: rise var(--t-item) var(--ease-out) both; }
+@keyframes rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+.fade { animation: fade-in var(--t-item) ease both; }
+
+/* Плашки поверх карты выезжают сверху — как уведомления. */
+.drop { animation: drop var(--t-item) var(--ease-out) both; }
+@keyframes drop {
+  from { opacity: 0; transform: translate3d(0, -12px, 0); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Метки на карте ────────────────────────────────────────── */
+
+/* Намеренно без fill-mode: Яндекс.Карты строят DOM метки лениво, и если
+   страница в этот момент скрыта, анимация не стартует. С `both` метка
+   залипла бы прозрачной; без него она просто окажется на месте сразу. */
+.pin-drop { animation: pin-drop 460ms var(--ease-spring); transform-origin: 50% 100%; }
+@keyframes pin-drop {
+  from { opacity: 0; transform: translate3d(0, -22px, 0) scale(0.6); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Полоса бюджета времени: сегменты вырастают слева ──────── */
+
+.budget--animate { animation: budget-grow 620ms var(--ease-out) both; transform-origin: left center; }
+@keyframes budget-grow {
+  from { transform: scaleX(0); opacity: 0.4; }
+  to { transform: scaleX(1); opacity: 1; }
+}
+
+/* Галочка выполненного шага подбора появляется с лёгким «щелчком». */
+.pop { animation: pop 300ms var(--ease-spring) both; }
+@keyframes pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ── Отклик на нажатие ─────────────────────────────────────── */
+
+.btn, .chip, .tile, .list__row, .nudge, .segmented__item, .icon-button, .params__edit, .stepper__btn {
+  transition: transform 140ms var(--ease-out), background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.btn:active, .chip:active, .tile:active, .nudge:active, .stepper__btn:active { transform: scale(0.975); }
+.list__row:active, .segmented__item:active { transform: scale(0.99); }
+.icon-button:active, .params__edit:active { transform: scale(0.92); }
+.list__row:disabled:active { transform: none; }
+
+/* ── Уважение к системной настройке ────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .stack__layer--push-in, .stack__layer--push-out,
+  .stack__layer--pop-in, .stack__layer--pop-out,
+  .overlay .scrim, .overlay .sheet,
+  .overlay--leaving .scrim, .overlay--leaving .sheet,
+  .rise, .fade, .drop, .pin-drop, .budget--animate, .pop, .panel-swap {
+    animation: none !important;
+  }
+  .btn:active, .chip:active, .tile:active, .nudge:active,
+  .list__row:active, .segmented__item:active, .icon-button:active,
+  .params__edit:active, .stepper__btn:active {
+    transform: none;
+  }
+}
+
+/* Подмена панели в шторке при переключении вкладки: экран остаётся на месте,
+   меняется только содержимое. */
+.panel-swap { animation: panel-swap 260ms var(--ease-out) both; }
+@keyframes panel-swap {
+  from { opacity: 0; transform: translate3d(0, 10px, 0); }
+  to { opacity: 1; transform: none; }
+}
