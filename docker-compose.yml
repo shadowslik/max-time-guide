@@ -1,19 +1,44 @@
 services:
+  # Обратный прокси + автоматический HTTPS (Let's Encrypt).
+  # Наружу открыты только 80/443, сертификат Caddy получает и продлевает сам.
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+
+  # Мини-приложение (React через nginx). Публичный порт не нужен — его проксирует Caddy.
+  frontend:
+    build:
+      context: ./frontend
+      # Ключи Яндекс.Карт нужны Vite во время сборки — берутся из корневого .env.
+      args:
+        VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
+        VITE_YANDEX_ROUTER_API_KEY: ${VITE_YANDEX_ROUTER_API_KEY:-}
+    restart: unless-stopped
+
+  # Чат-бот MAX (long polling).
   bot:
     build: ./backend
     command: python app/main.py
     env_file: .env
     restart: unless-stopped
 
-  frontend:
-    build:
-      context: ./frontend
-      # Ключи Яндекс.Карт нужны Vite во время сборки — env_file здесь не поможет,
-      # он задаёт переменные уже запущенному контейнеру. Значения берутся
-      # из корневого .env, которым и так пользуется бот.
-      args:
-        VITE_YANDEX_MAPS_API_KEY: ${VITE_YANDEX_MAPS_API_KEY:-}
-        VITE_YANDEX_ROUTER_API_KEY: ${VITE_YANDEX_ROUTER_API_KEY:-}
-    ports:
-      - "8080:80"
-    restart: unless-stopped
+  # FastAPI появится позже — раскомментируй, когда будет app.main:app,
+  # и раскомментируй блок /api в Caddyfile.
+  # api:
+  #   build: ./backend
+  #   command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+  #   env_file: .env
+  #   restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:
