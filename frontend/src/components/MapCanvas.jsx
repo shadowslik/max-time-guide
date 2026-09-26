@@ -1,238 +1,68 @@
-// Карта экрана. Если задан ключ VITE_YANDEX_MAPS_API_KEY — рисуем настоящие
-// Яндекс.Карты; иначе показываем схему из дизайна, чтобы прототип оставался
-// полностью рабочим без внешних сервисов.
+// Карта на MapLibre GL. Тайлы — OpenStreetMap (ключ не нужен) либо MapTiler,
+// если задан VITE_MAPTILER_KEY. Координаты везде [долгота, широта] — родной
+// порядок MapLibre, разворачивать ничего не надо.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+// maplibre-gl 6 отдаёт только именованные экспорты; Map переименован,
+// чтобы не перекрывать глобальный Map.
+import { Map as MapLibreMap, Marker, LngLatBounds } from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
 
-import SchematicMap, { SCHEMA_VIEWBOX } from './SchematicMap.jsx';
-import MapPin, { CenterPin, pinHtml, userDotHtml } from './MapPin.jsx';
-import { hasApiKey, loadYmaps, toLatLon } from '../lib/ymaps.js';
+import { CenterPin, pinElement, userElement } from './MapPin.jsx';
+import { hasVectorStyle, mapStyle } from '../lib/mapStyle.js';
 
-function useYmaps() {
-  const [mod, setMod] = useState(null);
-  useEffect(() => {
-    let alive = true;
-    loadYmaps().then((result) => {
-      if (alive) setMod(result);
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return mod;
-}
-
-// Размер контейнера нужен, чтобы совместить схему (390×844) с экраном
-// по тем же правилам, что и preserveAspectRatio="xMidYMin slice".
-function useElementSize() {
-  const ref = useRef(null);
-  const [size, setSize] = useState({ width: SCHEMA_VIEWBOX.width, height: SCHEMA_VIEWBOX.height });
-
-  useLayoutEffect(() => {
-    const node = ref.current;
-    if (!node) return undefined;
-    const update = () => setSize({ width: node.clientWidth, height: node.clientHeight });
-    update();
-    if (typeof ResizeObserver === 'undefined') return undefined;
-    const observer = new ResizeObserver(update);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
-
-  return [ref, size];
-}
-
-function schemaPath(points) {
-  return points.map((p, i) => `${i ? 'L' : 'M'}${p.x} ${p.y}`).join(' ');
-}
-
-function Marker({ marker, onSelect }) {
-  const pin = <MapPin tone={marker.tone} size={marker.size ?? 30} number={marker.number} glyph={marker.glyph} title={marker.title} />;
-  if (!onSelect) return pin;
-  return (
-    <button type="button" onClick={() => onSelect(marker.id)} aria-label={marker.title} style={{ border: 0, background: 'none', padding: 0, cursor: 'pointer', lineHeight: 0 }}>
-      {pin}
-    </button>
-  );
-}
-
-const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
-
-function SchematicLayer({ theme, markers, user, showHalo, routeSchema, centerPin, onSelect, focus, bottomInset = 0 }) {
-  const [ref, size] = useElementSize();
-  const { width: vw, height: vh } = SCHEMA_VIEWBOX;
-  // Схема ровно накрывает экран, поэтому панорамировать её некуда.
-  // Подзумиваем, когда часть экрана занята шторкой — появляется запас,
-  // и метка уезжает из-под шторки в видимую часть.
-  const cover = Math.max(size.width / vw, size.height / vh);
-  const scale = bottomInset > 0 || focus ? cover * 1.3 : cover;
-
-  // Центрируем схему на интересной точке, учитывая, что низ экрана
-  // закрыт шторкой: иначе метка окажется прямо под ней.
-  const anchor = focus ?? user?.pin ?? { x: vw / 2, y: vh / 2 };
-  const visibleHeight = size.height - Math.min(bottomInset, size.height * 0.82);
-  const offsetX = clamp(size.width / 2 - anchor.x * scale, Math.min(0, size.width - vw * scale), 0);
-  const offsetY = clamp(visibleHeight / 2 - anchor.y * scale, Math.min(0, size.height - vh * scale), 0);
-
-  return (
-    <div className="map__canvas" ref={ref}>
-      <div
-        style={{
-          position: 'absolute',
-          width: vw,
-          height: vh,
-          transformOrigin: '0 0',
-          transform: `translate(${offsetX}px, ${offsetY}px) scale(${scale})`,
-        }}
-      >
-        <SchematicMap theme={theme} />
-
-        {routeSchema?.length > 1 && (
-          <svg width={vw} height={vh} viewBox={`0 0 ${vw} ${vh}`} fill="none" style={{ position: 'absolute', inset: 0 }}>
-            <path d={schemaPath(routeSchema)} stroke="var(--surface)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" />
-            <path d={schemaPath(routeSchema)} stroke="var(--accent)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="0.1 7" />
-          </svg>
-        )}
-
-        {user && showHalo && <span className="user-halo" style={{ left: user.pin.x, top: user.pin.y }} />}
-        {user && <span className="user-dot" style={{ left: user.pin.x, top: user.pin.y }} />}
-        {user?.label && (
-          <span className="pin-label pin-label--accent" style={{ left: user.pin.x, top: user.pin.y - 20 }}>
-            {user.label}
-          </span>
-        )}
-
-        {markers.map((marker, index) => (
-          <span key={marker.id}>
-            <span
-              className={`pin pin-drop${marker.tone === 'muted' ? ' pin--muted' : ''}`}
-              style={{ left: marker.pin.x, top: marker.pin.y, animationDelay: `${index * 55}ms` }}
-            >
-              <Marker marker={marker} onSelect={onSelect} />
-            </span>
-            {marker.label && (
-              <span
-                className={`pin-label${marker.labelTone === 'dark' ? ' pin-label--dark' : ''}`}
-                style={{ left: marker.pin.x, top: marker.pin.y - (marker.size ?? 30) * 1.3 - 8 }}
-              >
-                {marker.label}
-              </span>
-            )}
-          </span>
-        ))}
-
-        {centerPin && (
-          <>
-            <span className="center-pin__shadow" />
-            <span className="center-pin">
-              <CenterPin />
-            </span>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
+const MAX_ZOOM = 16;
 
 function cssVar(name) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#5B47F5';
 }
 
-const MAX_ZOOM = 16;
+// Стиль загружается асинхронно, а слои можно добавлять только поверх готового.
+function whenStyleReady(map, run) {
+  if (map.isStyleLoaded()) {
+    run();
+    return undefined;
+  }
+  const handler = () => {
+    if (!map.isStyleLoaded()) return;
+    map.off('styledata', handler);
+    run();
+  };
+  map.on('styledata', handler);
+  return () => map.off('styledata', handler);
+}
 
-function YandexLayer({ ymaps, center, zoom, markers, user, showHalo, route, fit, bottomInset, onSelect }) {
-  const nodeRef = useRef(null);
-  // Карта живёт в state, а не в ref: её создание должно вызывать перерисовку,
-  // иначе эффект с метками не узнает, что карту пересоздали, и та останется пустой.
-  const [map, setMap] = useState(null);
+function drawRoute(map, line) {
+  const data = { type: 'Feature', geometry: { type: 'LineString', coordinates: line } };
 
-  useEffect(() => {
-    const instance = new ymaps.Map(
-      nodeRef.current,
-      { center: toLatLon(center), zoom, controls: [] },
-      { suppressMapOpenBlock: true, yandexMapDisablePoiInteractivity: true },
-    );
-    setMap(instance);
-    return () => {
-      instance.destroy();
-      setMap(null);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ymaps]);
-
-  // Массивы приходят новые на каждый рендер, поэтому сравниваем их по подписи:
-  // иначе метки пересоздавались бы постоянно и анимация появления мигала бы.
-  const markersKey = markers.map((m) => `${m.id}:${m.tone}:${m.size}:${m.number ?? ''}:${m.label ?? ''}`).join('|');
-  const routeKey = route?.length ? `${route.length}:${route[0]}` : '';
-  const fitKey = (fit ?? []).filter(Boolean).map((c) => c.join()).join('|');
-
-  const latest = useRef({ markers, route, user, fit, center });
-  latest.current = { markers, route, user, fit, center };
-
-  useEffect(() => {
-    if (!map) return;
-    const state = latest.current;
-    map.geoObjects.removeAll();
-
-    if (state.route?.length > 1) {
-      map.geoObjects.add(new ymaps.Polyline(state.route, {}, { strokeColor: '#FFFFFF', strokeWidth: 7, strokeOpacity: 0.9 }));
-      map.geoObjects.add(
-        new ymaps.Polyline(state.route, {}, { strokeColor: cssVar('--accent'), strokeWidth: 3, strokeStyle: 'dot' }),
-      );
-    }
-
-    if (state.user) {
-      map.geoObjects.add(
-        new ymaps.Placemark(toLatLon(state.user.coords), {}, {
-          iconLayout: ymaps.templateLayoutFactory.createClass(userDotHtml({ halo: showHalo, label: state.user.label })),
-          iconShape: { type: 'Circle', coordinates: [0, 0], radius: 12 },
-          zIndex: 700,
-        }),
-      );
-    }
-
-    state.markers.forEach((marker, index) => {
-      const size = marker.size ?? 30;
-      const placemark = new ymaps.Placemark(toLatLon(marker.coords), { hintContent: marker.title }, {
-        iconLayout: ymaps.templateLayoutFactory.createClass(pinHtml({ ...marker, delay: index * 55 })),
-        iconShape: { type: 'Rectangle', coordinates: [[-size / 2, -size * 1.3], [size / 2, 0]] },
-        zIndex: marker.tone === 'muted' ? 500 : 600,
-      });
-      if (onSelect) placemark.events.add('click', () => onSelect(marker.id));
-      map.geoObjects.add(placemark);
+  if (!map.getSource('route')) {
+    map.addSource('route', { type: 'geojson', data });
+    map.addLayer({
+      id: 'route-casing',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-color': '#FFFFFF', 'line-width': 7, 'line-opacity': 0.9 },
     });
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      // Короткий штрих с круглым концом читается как пунктир из точек.
+      paint: { 'line-color': cssVar('--accent'), 'line-width': 3, 'line-dasharray': [0.1, 2.4] },
+    });
+  } else {
+    map.getSource('route').setData(data);
+    map.setPaintProperty('route-line', 'line-color', cssVar('--accent'));
+  }
+}
 
-    // Кадрирование. Вписываем только значимые точки: если тянуть рамку
-    // до мест, куда всё равно не успеть, карта отъезжает и центр не читается.
-    const meaningful =
-      state.fit ?? [state.user?.coords, ...state.markers.filter((m) => m.tone !== 'muted').map((m) => m.coords)];
-    const points = meaningful.filter(Boolean).map(toLatLon);
-
-    try {
-      if (points.length > 1) {
-        map
-          .setBounds(ymaps.util.bounds.fromPoints(points), {
-            checkZoomRange: true,
-            zoomMargin: [80, 48, bottomInset + 32, 48],
-          })
-          .then(() => {
-            // Не приближаемся вплотную: две соседние точки иначе дают зум 19.
-            if (map.getZoom() > MAX_ZOOM) map.setZoom(MAX_ZOOM);
-          }, () => {});
-      } else {
-        map.setCenter(toLatLon(state.center), zoom);
-        if (bottomInset) {
-          const pixelCenter = map.getGlobalPixelCenter();
-          map.setGlobalPixelCenter([pixelCenter[0], pixelCenter[1] + bottomInset / 2]);
-        }
-      }
-    } catch {
-      /* карта ещё не готова принять кадрирование — оставляем как есть */
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, ymaps, markersKey, routeKey, fitKey, showHalo, zoom, bottomInset, onSelect]);
-
-  return <div className="map__canvas" ref={nodeRef} />;
+function clearRoute(map) {
+  for (const id of ['route-line', 'route-casing']) {
+    if (map.getLayer(id)) map.removeLayer(id);
+  }
+  if (map.getSource('route')) map.removeSource('route');
 }
 
 export default function MapCanvas({
@@ -243,66 +73,152 @@ export default function MapCanvas({
   user,
   showHalo = false,
   route,
-  routeSchema,
-  centerPin = false,
-  fade = false,
-  focus,
   fit,
   bottomInset = 0,
+  centerPin = false,
+  interactive = true,
   onSelect,
+  onCenterChange,
   children,
 }) {
-  const mod = useYmaps();
-  const ready = hasApiKey && mod;
+  const nodeRef = useRef(null);
+  const [map, setMap] = useState(null);
+  const markerRefs = useRef([]);
+
+  // Массивы приходят новые на каждый рендер — сравниваем по подписи,
+  // иначе метки пересоздавались бы постоянно и анимация появления мигала.
+  const markersKey = markers.map((m) => `${m.id}:${m.tone}:${m.size}:${m.number ?? ''}:${m.label ?? ''}`).join('|');
+  const routeKey = route?.length ? `${route.length}:${route[0]}` : '';
+  const fitKey = (fit ?? []).filter(Boolean).map((c) => c.join()).join('|');
+  const latest = useRef({ markers, route, user, fit, center });
+  latest.current = { markers, route, user, fit, center };
+
+  useEffect(() => {
+    const instance = new MapLibreMap({
+      container: nodeRef.current,
+      style: mapStyle(theme),
+      center,
+      zoom,
+      attributionControl: { compact: true },
+      dragRotate: false,
+      // Без этого содержимое WebGL-холста не попадает в снимки экрана
+      // (скриншоты, превью, отладка). Цена — небольшая, польза заметная.
+      preserveDrawingBuffer: true,
+      pitchWithRotate: false,
+      interactive,
+    });
+    instance.touchZoomRotate.disableRotation();
+    setMap(instance);
+
+    // MapLibre запоминает размер контейнера в момент создания. Если стили
+    // ещё не применились, холст остаётся обрезанным — следим за размером
+    // и пересчитываем. Тот же обработчик ловит поворот экрана.
+    const observer = new ResizeObserver(() => instance.resize());
+    observer.observe(nodeRef.current);
+
+    return () => {
+      observer.disconnect();
+      instance.remove();
+      setMap(null);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Тёмную схему умеет только векторный стиль. На растровом OSM тайлы
+  // инвертируются CSS-фильтром — метки и подписи при этом не трогаются.
+  useEffect(() => {
+    if (!map || !hasVectorStyle) return;
+    map.setStyle(mapStyle(theme));
+  }, [map, theme]);
+
+  useEffect(() => {
+    if (!map || !onCenterChange) return undefined;
+    const handler = () => onCenterChange(map.getCenter().toArray());
+    map.on('moveend', handler);
+    return () => map.off('moveend', handler);
+  }, [map, onCenterChange]);
+
+  // Метки: пересобираем целиком — их единицы, дешевле, чем сверять по одной.
+  useEffect(() => {
+    if (!map) return undefined;
+    const state = latest.current;
+
+    markerRefs.current.forEach((m) => m.remove());
+    markerRefs.current = [];
+
+    if (state.user) {
+      markerRefs.current.push(
+        new Marker({ element: userElement({ halo: showHalo, label: state.user.label }), anchor: 'center' })
+          .setLngLat(state.user.coords)
+          .addTo(map),
+      );
+    }
+
+    state.markers.forEach((marker, index) => {
+      const element = pinElement({
+        ...marker,
+        delay: index * 55,
+        onClick: onSelect ? () => onSelect(marker.id) : undefined,
+      });
+      markerRefs.current.push(
+        new Marker({ element, anchor: 'bottom' }).setLngLat(marker.coords).addTo(map),
+      );
+    });
+
+    return () => {
+      markerRefs.current.forEach((m) => m.remove());
+      markerRefs.current = [];
+    };
+  }, [map, markersKey, showHalo, onSelect]);
+
+  // Линия маршрута. Слои живут поверх стиля, поэтому ждём его готовности
+  // и перерисовываем после каждой смены темы.
+  useEffect(() => {
+    if (!map) return undefined;
+    const line = latest.current.route;
+    const off = whenStyleReady(map, () => {
+      if (line?.length > 1) drawRoute(map, line);
+      else clearRoute(map);
+    });
+    return off;
+  }, [map, routeKey, theme]);
+
+  // Кадрирование: вписываем значимые точки, приподнимая их над шторкой.
+  useEffect(() => {
+    if (!map) return;
+    const state = latest.current;
+    const padding = { top: 96, right: 48, bottom: bottomInset + 40, left: 48 };
+    const points = (state.fit ?? [state.user?.coords, ...state.markers.filter((m) => m.tone !== 'muted').map((m) => m.coords)])
+      .filter(Boolean);
+
+    if (points.length > 1) {
+      const bounds = points.reduce(
+        (acc, coords) => acc.extend(coords),
+        new LngLatBounds(points[0], points[0]),
+      );
+      map.fitBounds(bounds, { padding, maxZoom: MAX_ZOOM, duration: 650 });
+    } else {
+      map.easeTo({ center: state.center ?? points[0], zoom, padding, duration: 650 });
+    }
+  }, [map, markersKey, fitKey, bottomInset, zoom]);
 
   return (
-    <div className="map" style={{ '--sheet-h': `${bottomInset}px` }}>
-      {ready ? (
+    <div
+      className={`map${hasVectorStyle ? '' : ' map--raster'}`}
+      style={{ '--sheet-h': `${bottomInset}px` }}
+    >
+      <div className="map__canvas" ref={nodeRef} />
+
+      {centerPin && (
         <>
-          <YandexLayer
-            ymaps={mod}
-            center={center ?? user?.coords ?? markers[0]?.coords}
-            zoom={zoom}
-            markers={markers}
-            user={user}
-            showHalo={showHalo}
-            route={route}
-            fit={fit}
-            bottomInset={bottomInset}
-            onSelect={onSelect}
-          />
-          {centerPin && (
-            <>
-              <span className="center-pin__shadow" />
-              <span className="center-pin">
-                <CenterPin />
-              </span>
-            </>
-          )}
+          <span className="center-pin__shadow" />
+          <span className="center-pin">
+            <CenterPin />
+          </span>
         </>
-      ) : (
-        <SchematicLayer
-          theme={theme}
-          markers={markers}
-          user={user}
-          showHalo={showHalo}
-          routeSchema={routeSchema}
-          centerPin={centerPin}
-          focus={focus}
-          bottomInset={bottomInset}
-          onSelect={onSelect}
-        />
       )}
 
-      {fade && <div className="map__fade" />}
       <div className="map-overlay">{children}</div>
     </div>
   );
-}
-
-// Ступенчатая линия между двумя метками схемы — похожа на ход по улицам,
-// в отличие от прямой «по воздуху».
-export function schemaRoute(from, to) {
-  const midY = Math.round((from.y + to.y) / 2);
-  return [from, { x: from.x, y: midY }, { x: to.x, y: midY }, to];
 }

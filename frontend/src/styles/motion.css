@@ -44,10 +44,17 @@
   to { transform: translate3d(100%, 0, 0); }
 }
 
-/* ── Модальные шторки поверх экрана ────────────────────────── */
+/* ── Шторки ────────────────────────────────────────────────── */
+
+/* Любая шторка выезжает снизу, а не появляется рывком. Задержка нужна,
+   чтобы экран успел доехать: иначе два движения идут одновременно и
+   читаются как рывок. Анимация живёт на .sheet, а перетаскивание —
+   на обёртке, поэтому трансформации не затирают друг друга. */
+.sheet { animation: sheet-up var(--t-sheet) var(--ease-out) 110ms both; }
 
 .overlay { position: absolute; inset: 0; z-index: 10; }
 .overlay .scrim { animation: fade-in var(--t-sheet) ease both; }
+/* Модальная шторка выезжает сразу — под ней нет экрана, который едет. */
 .overlay .sheet { animation: sheet-up var(--t-sheet) var(--ease-out) both; }
 .overlay--leaving { pointer-events: none; }
 .overlay--leaving .scrim { animation: fade-in var(--t-sheet) ease both reverse; }
@@ -61,16 +68,15 @@
 
 /* ── Появление содержимого ─────────────────────────────────── */
 
-.rise { animation: rise var(--t-item) var(--ease-out) both; }
+.rise { animation: rise var(--t-item) var(--ease-out) 110ms both; }
 @keyframes rise {
   from { opacity: 0; transform: translate3d(0, 14px, 0); }
   to { opacity: 1; transform: none; }
 }
 
-.fade { animation: fade-in var(--t-item) ease both; }
 
 /* Плашки поверх карты выезжают сверху — как уведомления. */
-.drop { animation: drop var(--t-item) var(--ease-out) both; }
+.drop { animation: drop var(--t-item) var(--ease-out) 110ms both; }
 @keyframes drop {
   from { opacity: 0; transform: translate3d(0, -12px, 0); }
   to { opacity: 1; transform: none; }
@@ -118,9 +124,9 @@
 @media (prefers-reduced-motion: reduce) {
   .stack__layer--push-in, .stack__layer--push-out,
   .stack__layer--pop-in, .stack__layer--pop-out,
-  .overlay .scrim, .overlay .sheet,
+  .sheet, .overlay .scrim, .overlay .sheet,
   .overlay--leaving .scrim, .overlay--leaving .sheet,
-  .rise, .fade, .drop, .pin-drop, .budget--animate, .pop, .panel-swap {
+  .rise, .drop, .pin-drop, .budget--animate, .pop, .panel-swap {
     animation: none !important;
   }
   .btn:active, .chip:active, .tile:active, .nudge:active,

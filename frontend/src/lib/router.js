@@ -1,68 +1,62 @@
-// Клиент «API Получения деталей маршрута» Яндекса (Routing API).
+// Пешие маршруты через OpenRouteService.
 //
-// Это отдельный платный продукт со своим ключом — не тем, что у JS API.
-// Ключ лежит в VITE_YANDEX_ROUTER_API_KEY.
+// Бесплатный тариф: 2500 запросов в сутки, 40 000 в месяц — на все сервисы
+// вместе. Ключ бесплатный, но требует регистрации на openrouteservice.org.
+// Без ключа приложение работает: линия маршрута рисуется прямой, а тайминги
+// всё равно считает свой планировщик и от сети не зависят.
 //
-// ВНИМАНИЕ: у Routing API нет ограничения по HTTP referer, поэтому ключ,
-// попавший в клиентский бандл, виден любому, кто откроет DevTools. Для
-// продакшена запрос нужно унести на бэкенд; здесь он во фронтенде осознанно,
-// ради демо. Точка переноса одна — функция requestRoute ниже.
+// Координаты везде [долгота, широта] — родной формат и ORS, и MapLibre.
 
-const API_KEY = import.meta.env.VITE_YANDEX_ROUTER_API_KEY;
-const ENDPOINT = 'https://api.routing.yandex.net/v2/route';
+const API_KEY = import.meta.env.VITE_ORS_API_KEY;
+const ENDPOINT = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson';
 
 export const hasRouterKey = Boolean(API_KEY);
 
-// В данных координаты лежат как [долгота, широта], API ждёт «широта,долгота».
-const toWaypoint = ([lon, lat]) => `${lat},${lon}`;
-
-async function requestRoute(points) {
-  const url =
-    `${ENDPOINT}?apikey=${encodeURIComponent(API_KEY)}` +
-    `&waypoints=${encodeURIComponent(points.map(toWaypoint).join('|'))}` +
-    '&mode=walking';
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Routing API ответил ${response.status}`);
-  }
-  return response.json();
-}
-
 // Возвращает { line, legs } либо null, если маршрут построить не удалось.
-//   line — [[широта, долгота], …] в порядке, который ждут Яндекс.Карты 2.1;
-//   legs — по одному участку на пару соседних точек: { duration (мин), length (м) }.
+//   line — [[долгота, широта], …] для слоя линии на карте;
+//   legs — по участку на пару соседних точек: { duration (мин), length (м) }.
 export async function fetchRouteDetails(points) {
   if (!hasRouterKey || points.length < 2) return null;
 
   try {
-    const data = await requestRoute(points);
-    const legs = data?.route?.legs;
-    if (!Array.isArray(legs) || !legs.length) return null;
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: {
+        Authorization: API_KEY,
+        'Content-Type': 'application/json',
+        Accept: 'application/geo+json',
+      },
+      body: JSON.stringify({ coordinates: points }),
+    });
 
-    const line = [];
-    const summary = [];
-
-    for (const leg of legs) {
-      let seconds = 0;
-      let meters = 0;
-      for (const step of leg.steps ?? []) {
-        seconds += step.duration ?? 0;
-        meters += step.length ?? 0;
-        for (const point of step.polyline?.points ?? []) line.push(point);
-      }
-      summary.push({ duration: Math.round(seconds / 60), length: Math.round(meters) });
+    if (!response.ok) {
+      throw new Error(`OpenRouteService ответил ${response.status}`);
     }
 
-    return line.length > 1 ? { line, legs: summary } : null;
+    const data = await response.json();
+    const feature = data?.features?.[0];
+    const line = feature?.geometry?.coordinates;
+    if (!Array.isArray(line) || line.length < 2) return null;
+
+    const legs = (feature.properties?.segments ?? []).map((segment) => ({
+      duration: Math.round((segment.duration ?? 0) / 60),
+      length: Math.round(segment.distance ?? 0),
+    }));
+
+    return { line, legs };
   } catch (error) {
     console.warn('[Рядом] Маршрут не построен, рисуем прямую линию —', error.message);
     return null;
   }
 }
 
-// Ссылка на пеший маршрут в Яндекс.Картах — для кнопки «Открыть маршрут».
+// Ссылка на пеший маршрут во внешних картах — для кнопки «Открыть маршрут».
+// OpenStreetMap умеет строить маршрут по ссылке и не требует ключа.
 export function externalRouteUrl(points) {
-  const rtext = points.map(toWaypoint).join('~');
-  return `https://yandex.ru/maps/?rtext=${encodeURIComponent(rtext)}&rtt=pd`;
+  const [fromLon, fromLat] = points[0];
+  const [toLon, toLat] = points[points.length - 1];
+  return (
+    'https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot' +
+    `&route=${fromLat}%2C${fromLon}%3B${toLat}%2C${toLon}`
+  );
 }

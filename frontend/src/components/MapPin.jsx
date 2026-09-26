@@ -59,8 +59,9 @@ export function toneForStatus(status) {
   return 'muted';
 }
 
-// Та же метка, но строкой HTML — для меток Яндекс.Карт 2.1,
-// которые рисуются через templateLayoutFactory, а не через React.
+// Та же метка, но узлом DOM — MapLibre размещает метки собственными
+// элементами, а не React-деревом. Позиционирует их сам (anchor: 'bottom'),
+// поэтому никаких transform внутри быть не должно.
 function pinSvgHtml({ tone = 'ok', size = 30, number, glyph }) {
   const height = Math.round((size * 36) / 28);
   const inner =
@@ -77,21 +78,35 @@ function pinSvgHtml({ tone = 'ok', size = 30, number, glyph }) {
   );
 }
 
-export function pinHtml({ label, labelTone, delay = 0, ...pin }) {
-  const labelHtml = label
-    ? `<div class="pin-label ymx-pin__label${labelTone === 'dark' ? ' pin-label--dark' : ''}">${label}</div>`
-    : '';
-  const muted = pin.tone === 'muted' ? ' ymx-pin--muted' : '';
-  return (
-    `<div class="ymx-pin pin-drop${muted}" style="animation-delay:${delay}ms">` +
-    `${labelHtml}${pinSvgHtml(pin)}</div>`
-  );
+export function pinElement({ label, labelTone, delay = 0, onClick, ...pin }) {
+  const node = document.createElement('div');
+  node.className = `map-pin pin-drop${pin.tone === 'muted' ? ' map-pin--muted' : ''}`;
+  node.style.animationDelay = `${delay}ms`;
+  node.innerHTML =
+    (label ? `<span class="pin-label${labelTone === 'dark' ? ' pin-label--dark' : ''}">${label}</span>` : '') +
+    pinSvgHtml(pin);
+
+  if (onClick) {
+    node.setAttribute('role', 'button');
+    node.tabIndex = 0;
+    if (pin.title) node.setAttribute('aria-label', pin.title);
+    node.addEventListener('click', onClick);
+    node.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        onClick();
+      }
+    });
+  }
+  return node;
 }
 
-export function userDotHtml({ halo = false, label } = {}) {
-  const haloHtml = halo ? '<span class="user-halo ymx-user__halo"></span>' : '';
-  const labelHtml = label
-    ? `<span class="pin-label pin-label--accent ymx-user__label">${label}</span>`
-    : '';
-  return `<div class="ymx-user">${haloHtml}<span class="user-dot ymx-user__dot"></span>${labelHtml}</div>`;
+export function userElement({ halo = false, label } = {}) {
+  const node = document.createElement('div');
+  node.className = 'map-user';
+  node.innerHTML =
+    (halo ? '<span class="map-user__halo"></span>' : '') +
+    '<span class="map-user__dot"></span>' +
+    (label ? `<span class="pin-label pin-label--accent map-user__label">${label}</span>` : '');
+  return node;
 }
