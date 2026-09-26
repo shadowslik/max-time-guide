@@ -4,8 +4,10 @@ import Icon from '../components/Icon.jsx';
 import MapCanvas from '../components/MapCanvas.jsx';
 import { Button, Sheet, Steps } from '../components/ui.jsx';
 import { CITY } from '../data/places.js';
+import { hasGeocoder } from '../lib/geocoder.js';
 
-const SHEET = 392;
+// Без кнопки «Ввести адрес» шторке не нужна её высота.
+const SHEET = hasGeocoder ? 392 : 328;
 
 export default function LocationScreen({ theme, start, onConfirm, onAddress, onHistory }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
@@ -72,10 +74,14 @@ export default function LocationScreen({ theme, start, onConfirm, onAddress, onH
           </div>
 
           <Button className="mt-10" onClick={() => onConfirm(coords)}>Я здесь</Button>
-          <Button variant="secondary" onClick={onAddress}>
-            <Icon name="search" size={19} />
-            Ввести адрес
-          </Button>
+          {/* Без ключа геокодера искать нечем — кнопку не показываем,
+              чтобы она не вела на пустой экран. */}
+          {hasGeocoder && (
+            <Button variant="secondary" onClick={onAddress}>
+              <Icon name="search" size={19} />
+              Ввести адрес
+            </Button>
+          )}
         </Sheet>
       </MapCanvas>
     </div>

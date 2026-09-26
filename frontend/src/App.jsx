@@ -56,6 +56,12 @@ export default function App() {
     directionRef.current = 'push';
     setStack(names);
   }, []);
+  // Подменить верхний экран, сохранив всё, что под ним. Именно этого не хватало:
+  // подбор раньше затирал стек целиком, и с результатов некуда было вернуться.
+  const swap = useCallback((name) => {
+    directionRef.current = 'push';
+    setStack((s) => [...s.slice(0, -1), name]);
+  }, []);
 
   useEffect(() => {
     notifyReady();
@@ -81,9 +87,14 @@ export default function App() {
       setSelectedId(found.find((p) => p.eval.status !== 'no')?.id ?? found[0]?.id ?? null);
       setMode('single');
       setSheet(null);
-      replace('loading');
+      // Повторный подбор подменяет текущий экран, первый — добавляется поверх.
+      setStack((s) => {
+        const top = s[s.length - 1];
+        directionRef.current = 'push';
+        return ['loading', 'results', 'nofit'].includes(top) ? [...s.slice(0, -1), 'loading'] : [...s, 'loading'];
+      });
     },
-    [minutes, interests, start, replace],
+    [minutes, interests, start],
   );
 
   const toggleInterest = (id) =>
@@ -144,7 +155,8 @@ export default function App() {
       setResults(pickPlaces(nextMinutes, nextInterests, start));
       setChain(buildChain(nextMinutes, nextInterests, start));
       setSelectedId(place.id);
-      replace('results', 'route');
+      // Из истории путь назад должен вести к карте, а не в тупик.
+      replace('location', 'results', 'route');
     },
     [interests, start, replace],
   );
@@ -188,7 +200,7 @@ export default function App() {
             interests={interests}
             found={results.length}
             fits={fitsCount}
-            onDone={() => replace('interests', fitsCount ? 'results' : 'nofit')}
+            onDone={() => swap(fitsCount ? 'results' : 'nofit')}
           />
         );
 
@@ -249,9 +261,9 @@ export default function App() {
             nearest={nearest}
             suggestion={pickPlaces(minutes + 30, interests).filter((p) => p.eval.status !== 'no').length}
             onAddTime={() => runSearch(minutes + 30, interests)}
-            onEditInterests={() => replace('location', 'time', 'interests')}
-            onShowAnyway={() => replace('interests', 'results')}
-            onBack={() => replace('location', 'time')}
+            onEditInterests={back}
+            onShowAnyway={() => swap('results')}
+            onBack={back}
           />
         );
 
