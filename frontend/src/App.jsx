@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Overlay, ScreenStack } from './components/ScreenStack.jsx';
 import LocationScreen from './screens/LocationScreen.jsx';
+import AddressScreen from './screens/AddressScreen.jsx';
 import TimeScreen from './screens/TimeScreen.jsx';
 import TimeCustomSheet from './screens/TimeCustomSheet.jsx';
 import InterestsScreen from './screens/InterestsScreen.jsx';
@@ -254,6 +255,17 @@ export default function App() {
           />
         );
 
+      case 'address':
+        return (
+          <AddressScreen
+            onPick={(coords) => {
+              setStart(coords);
+              back();
+            }}
+            onBack={back}
+          />
+        );
+
       case 'history':
         return (
           <HistoryScreen
@@ -274,6 +286,7 @@ export default function App() {
               setStart(coords);
               go('time');
             }}
+            onAddress={() => go('address')}
             onHistory={() => go('history')}
           />
         );

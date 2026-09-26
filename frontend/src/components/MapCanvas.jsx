@@ -77,6 +77,7 @@ export default function MapCanvas({
   bottomInset = 0,
   centerPin = false,
   interactive = true,
+  recenterKey,
   onSelect,
   onCenterChange,
   children,
@@ -183,11 +184,27 @@ export default function MapCanvas({
     return off;
   }, [map, routeKey, theme]);
 
+  // Низ карты закрыт шторкой. Задаём padding, чтобы «центр карты» для
+  // MapLibre означал центр ВИДИМОЙ части: тогда getCenter() возвращает ту
+  // точку, над которой реально стоит метка-перекрестие.
+  useEffect(() => {
+    if (!map) return;
+    map.setPadding({ top: 0, right: 0, bottom: bottomInset, left: 0 });
+  }, [map, bottomInset]);
+
+  // Точку задали снаружи (выбрали адрес) — перелетаем к ней. Отдельно от
+  // кадрирования, иначе перетаскивание карты вызывало бы возврат назад.
+  useEffect(() => {
+    if (!map || !recenterKey) return;
+    map.easeTo({ center: latest.current.center, zoom, duration: 700 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, recenterKey]);
+
   // Кадрирование: вписываем значимые точки, приподнимая их над шторкой.
   useEffect(() => {
     if (!map) return;
     const state = latest.current;
-    const padding = { top: 96, right: 48, bottom: bottomInset + 40, left: 48 };
+    const padding = { top: 96, right: 48, bottom: 40, left: 48 };
     const points = (state.fit ?? [state.user?.coords, ...state.markers.filter((m) => m.tone !== 'muted').map((m) => m.coords)])
       .filter(Boolean);
 
@@ -203,10 +220,7 @@ export default function MapCanvas({
   }, [map, markersKey, fitKey, bottomInset, zoom]);
 
   return (
-    <div
-      className={`map${hasVectorStyle ? '' : ' map--raster'}`}
-      style={{ '--sheet-h': `${bottomInset}px` }}
-    >
+    <div className={`map${hasVectorStyle ? '' : ' map--raster'}`}>
       <div className="map__canvas" ref={nodeRef} />
 
       {centerPin && (

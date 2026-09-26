@@ -1,3 +1,4 @@
+import Icon from '../components/Icon.jsx';
 import TimeBudgetBar from '../components/TimeBudgetBar.jsx';
 import { Button, Screen, SectionLabel, TopBar } from '../components/ui.jsx';
 import { INTERESTS } from '../data/places.js';
@@ -15,23 +16,22 @@ export default function NoFitScreen({ minutes, interests, nearest, suggestion, o
         </span>
       </TopBar>
 
-      <div className="mt-14" style={{ borderRadius: 22, background: 'var(--surface-3)', padding: '18px 0' }}>
-        <svg viewBox="0 0 310 170" width="100%" height="170" fill="none" style={{ display: 'block' }} role="img" aria-label="Ближайшее место лежит за пределами доступного радиуса">
-          <circle cx="108" cy="86" r="62" fill="var(--track)" stroke="var(--dashed)" strokeWidth="2" strokeDasharray="7 7" />
-          <circle cx="108" cy="86" r="11" fill="var(--blue)" stroke="#FFFFFF" strokeWidth="3.5" />
-          <path d="M124 82 232 66" stroke="var(--chevron)" strokeWidth="3" strokeLinecap="round" strokeDasharray="0.1 9" />
-          <path d="M253 34c7.2 0 13.1 5.9 13.1 13.1 0 8.9-11.2 19.7-12.5 20.9a.9.9 0 0 1-1.2 0c-1.3-1.2-12.5-12-12.5-20.9C240 39.9 245.8 34 253 34Z" fill="var(--muted-pin)" stroke="#FFFFFF" strokeWidth="2" />
-          <circle cx="253" cy="47" r="4.6" fill="#FFFFFF" />
-          <text x="108" y="160" textAnchor="middle" fontFamily="-apple-system, system-ui, sans-serif" fontSize="13" fontWeight="600" fill="var(--text-2)">
-            всё, что успеешь за {minutes} мин
-          </text>
-          <text x="253" y="88" textAnchor="middle" fontFamily="-apple-system, system-ui, sans-serif" fontSize="13" fontWeight="600" fill="var(--text-2)">
+      {/* Схема «радиус, в который упираешься»: кружок — докуда успеваешь,
+          метка снаружи — ближайшее место. Обе иконки из Material Symbols. */}
+      <div className="reach mt-14">
+        <div className="reach__circle">
+          <span className="reach__dot" />
+          <span className="reach__caption">всё, что успеешь за {minutes} мин</span>
+        </div>
+        <span className="reach__link" />
+        <div className="reach__far">
+          <Icon name="pin" size={40} />
+          <span className="reach__caption">
             {nearest?.walkTo ?? 0} мин
-          </text>
-          <text x="253" y="105" textAnchor="middle" fontFamily="-apple-system, system-ui, sans-serif" fontSize="13" fontWeight="600" fill="var(--text-2)">
+            <br />
             пешком
-          </text>
-        </svg>
+          </span>
+        </div>
       </div>
 
       <h1 className="title-xl mt-22" style={{ fontSize: 27 }}>

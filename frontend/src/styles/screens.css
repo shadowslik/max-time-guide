@@ -58,9 +58,11 @@
 .pin-label--dark { background: var(--tooltip-bg); color: var(--tooltip-fg); font-size: 12px; }
 .pin-label--accent { color: var(--accent-text); font-size: 12.5px; }
 
-/* Метка в центре экрана: её ставит пользователь, двигая карту под ней. */
+/* Метка-перекрестие: стоит в центре ВИДИМОЙ части карты, а не всего холста,
+   потому что низ закрыт шторкой. Карта об этом знает через свой padding,
+   поэтому getCenter() указывает ровно сюда. */
 .center-pin {
-  position: absolute; left: 50%; top: 50%;
+  position: absolute; left: 50%; top: calc(50% - var(--sheet-h, 0px) / 2);
   transform: translate(-50%, -100%);
   color: var(--accent-text);
   line-height: 0;
@@ -68,7 +70,7 @@
   filter: drop-shadow(0 6px 10px rgba(16, 17, 20, 0.25));
 }
 .center-pin__shadow {
-  position: absolute; left: 50%; top: 50%;
+  position: absolute; left: 50%; top: calc(50% - var(--sheet-h, 0px) / 2);
   width: 38px; height: 10px;
   margin-left: -19px;
   border-radius: 50%;
@@ -76,11 +78,18 @@
   pointer-events: none;
 }
 
-/* Атрибуция обязательна по условиям OSM — не даём шторке её закрыть. */
+/* Атрибуция обязательна по условиям OSM — не даём шторке её закрыть.
+   Высоту шторки она сообщает сама, в том числе пока её тянут. */
 .map .maplibregl-ctrl-bottom-right,
 .map .maplibregl-ctrl-bottom-left {
   bottom: calc(var(--sheet-h, 0px) + 6px);
   z-index: 4;
+  transition: bottom 300ms var(--ease-out, ease);
+}
+/* Во время жеста переход мешает: значок должен идти ровно за пальцем. */
+.map--sheet-dragging .maplibregl-ctrl-bottom-right,
+.map--sheet-dragging .maplibregl-ctrl-bottom-left {
+  transition: none;
 }
 
 /* У растровых тайлов нет тёмной схемы — инвертируем сам холст.
@@ -254,7 +263,6 @@
 .mt-16 { margin-top: 16px; } .mt-18 { margin-top: 18px; } .mt-20 { margin-top: 20px; }
 .mt-22 { margin-top: 22px; } .mt-24 { margin-top: 24px; } .mt-26 { margin-top: 26px; }
 .row { display: flex; align-items: center; gap: 10px; }
-.row--top { align-items: flex-start; }
 .grow { flex-grow: 1; min-width: 0; }
 
 
@@ -264,4 +272,116 @@
   color: var(--text-3);
   text-align: center;
   letter-spacing: 0.2px;
+}
+
+/* ── Поле ввода адреса ─────────────────────────────────────── */
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1.5px solid var(--sep);
+  border-radius: var(--radius-button);
+  background: var(--surface-2);
+}
+.field:focus-within { border-color: var(--accent-text); background: var(--surface); }
+.field__icon { flex-shrink: 0; color: var(--text-3); }
+.field__input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+.field__input::placeholder { color: var(--text-4); }
+.field__clear {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: var(--grabber);
+  color: var(--surface);
+  cursor: pointer;
+}
+
+.hint-line { margin: 0; text-align: center; font-size: 13.5px; line-height: 1.45; color: var(--text-3); }
+
+/* Индикатор подбора: кольцо крутится вокруг иконки Material Symbols. */
+.loader {
+  position: relative;
+  width: 132px; height: 132px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.loader__ring {
+  position: absolute;
+  inset: 0;
+  border: 5px solid var(--bar-buffer);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ryadom-spin 1.1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .loader__ring { animation: none; } }
+
+/* ── Схема «не успеваешь» ──────────────────────────────────── */
+
+.reach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* снизу запас под подпись, которая висит под кружком */
+  padding: 20px 16px 44px;
+  border-radius: 22px;
+  background: var(--surface-3);
+}
+.reach__circle {
+  position: relative;
+  flex-shrink: 0;
+  width: 128px; height: 128px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--dashed);
+  border-radius: 50%;
+  background: var(--track);
+}
+.reach__dot {
+  width: 22px; height: 22px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: var(--shadow-pin);
+}
+.reach__link {
+  flex-shrink: 0;
+  width: 46px;
+  border-top: 3px dotted var(--chevron);
+}
+.reach__far {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  color: var(--muted-pin);
+}
+.reach__caption {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-2);
+  text-align: center;
+}
+.reach__circle .reach__caption {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }

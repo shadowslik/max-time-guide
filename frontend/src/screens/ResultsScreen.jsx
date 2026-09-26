@@ -33,7 +33,7 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
         style={{ border: 0, background: 'none', padding: 0, width: '100%', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
         onClick={onOpenPlace}
       >
-        <div className="row row--top">
+        <div className="row">
           <div className="grow">
             <div className="row">
               <h2 className="title-s">{selected.name}</h2>
@@ -43,7 +43,7 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
               {interestsLabel(selected.interests, INTERESTS)} · {selected.price} · {selected.hours}
             </div>
           </div>
-          <span style={{ flexShrink: 0, color: 'var(--chevron)', marginTop: 3, display: 'flex' }}>
+          <span style={{ flexShrink: 0, color: 'var(--chevron)', display: 'flex' }}>
             <Icon name="chevronRight" size={20} />
           </span>
         </div>
@@ -185,7 +185,6 @@ export default function ResultsScreen({
           title: place.name,
           tone: toneForStatus(place.eval.status),
           size: active ? 40 : place.eval.status === 'no' ? 24 : 30,
-          glyph: active ? 'museum' : undefined,
           label: active ? `${place.short} · ${place.walkTo} мин` : undefined,
           labelTone: 'dark',
         };

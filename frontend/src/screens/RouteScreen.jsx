@@ -58,7 +58,7 @@ export default function RouteScreen({ theme, start, place, minutes, startAt, onB
         center={place.coords}
         zoom={15}
         user={{ coords: start }}
-        markers={[{ id: place.id, coords: place.coords, tone: 'ok', size: 40, glyph: 'museum', title: place.name }]}
+        markers={[{ id: place.id, coords: place.coords, tone: 'ok', size: 40, title: place.name }]}
         route={route}
         fit={points}
         bottomInset={430}

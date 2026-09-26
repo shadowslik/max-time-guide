@@ -12,7 +12,7 @@ function Mark({ item }) {
       </span>
     );
   }
-  return <MapPin tone="ok" size={18} number={item.number} glyph={item.glyph} />;
+  return <MapPin tone="ok" size={18} number={item.number} />;
 }
 
 export default function Timeline({ items }) {

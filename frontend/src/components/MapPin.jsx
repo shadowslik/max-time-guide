@@ -7,37 +7,34 @@ export const TONE = {
   accent: 'var(--accent)',
 };
 
-export const TEARDROP =
-  'M14 .9C21.2.9 27.1 6.8 27.1 14c0 8.9-11.2 19.7-12.5 20.9a.9.9 0 0 1-1.2 0C12.1 33.7.9 22.9.9 14 .9 6.8 6.8.9 14 .9Z';
+// Капля метки — Material Symbols «location_on» (заливка), та же сетка
+// 0 -960 960 960, что и у остальных иконок. Остриё приходится на низ
+// viewBox, поэтому метка ставится anchor: 'bottom' без поправок.
+export const TEARDROP = 'M536.5-503.5Q560-527 560-560t-23.5-56.5Q513-640 480-640t-56.5 23.5Q400-593 400-560t23.5 56.5Q447-480 480-480t56.5-23.5ZM480-80Q319-217 239.5-334.5T160-552q0-150 96.5-239T480-880q127 0 223.5 89T800-552q0 100-79.5 217.5T480-80Z';
 
-export default function MapPin({ tone = 'ok', size = 30, number, glyph, title }) {
-  const height = Math.round((size * 36) / 28);
+// Центр «шарика» внутри капли в координатах этой сетки.
+const EYE = { cx: 480, cy: -560, r: 132 };
+
+export default function MapPin({ tone = 'ok', size = 30, number, title }) {
+  const height = Math.round(size * 1.2);
   return (
-    <svg width={size} height={height} viewBox="0 0 28 36" fill="none" role="img" aria-label={title}>
+    <svg width={size} height={height} viewBox="0 -960 960 960" fill="none" role="img" aria-label={title}>
       {title ? <title>{title}</title> : null}
-      <path d={TEARDROP} fill={TONE[tone] ?? TONE.ok} stroke="#FFFFFF" strokeWidth="1.8" />
+      <path d={TEARDROP} fill={TONE[tone] ?? TONE.ok} stroke="#FFFFFF" strokeWidth="46" paintOrder="stroke" />
       {number != null ? (
         <text
-          x="14"
-          y="18.8"
+          x={EYE.cx}
+          y={EYE.cy + 60}
           textAnchor="middle"
           fontFamily="-apple-system, system-ui, sans-serif"
-          fontSize="14"
+          fontSize="200"
           fontWeight="700"
           fill="#FFFFFF"
         >
           {number}
         </text>
-      ) : glyph === 'museum' ? (
-        <path
-          d="M9 18.5h10M10.5 18.5v-5.2M13 18.5v-5.2M15 18.5v-5.2M17.5 18.5v-5.2M9.2 13 14 9.3l4.8 3.7"
-          stroke="#FFFFFF"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
       ) : (
-        <circle cx="14" cy="14" r="4.6" fill="#FFFFFF" />
+        <circle cx={EYE.cx} cy={EYE.cy} r={EYE.r} fill="#FFFFFF" />
       )}
     </svg>
   );
@@ -46,9 +43,9 @@ export default function MapPin({ tone = 'ok', size = 30, number, glyph, title })
 // Крупная перетаскиваемая метка в центре экрана «указать место на карте».
 export function CenterPin() {
   return (
-    <svg width="40" height="50" viewBox="0 0 28 36" fill="none" aria-hidden="true">
-      <path d={TEARDROP} fill="currentColor" />
-      <circle cx="14" cy="14" r="5.4" fill="#FFFFFF" />
+    <svg width="42" height="50" viewBox="0 -960 960 960" fill="none" aria-hidden="true">
+      <path d={TEARDROP} fill="currentColor" stroke="#FFFFFF" strokeWidth="40" paintOrder="stroke" />
+      <circle cx={EYE.cx} cy={EYE.cy} r={EYE.r} fill="#FFFFFF" />
     </svg>
   );
 }
@@ -62,18 +59,16 @@ export function toneForStatus(status) {
 // Та же метка, но узлом DOM — MapLibre размещает метки собственными
 // элементами, а не React-деревом. Позиционирует их сам (anchor: 'bottom'),
 // поэтому никаких transform внутри быть не должно.
-function pinSvgHtml({ tone = 'ok', size = 30, number, glyph }) {
-  const height = Math.round((size * 36) / 28);
+function pinSvgHtml({ tone = 'ok', size = 30, number }) {
+  const height = Math.round(size * 1.2);
   const inner =
     number != null
-      ? `<text x="14" y="18.8" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="14" font-weight="700" fill="#FFFFFF">${number}</text>`
-      : glyph === 'museum'
-        ? '<path d="M9 18.5h10M10.5 18.5v-5.2M13 18.5v-5.2M15 18.5v-5.2M17.5 18.5v-5.2M9.2 13 14 9.3l4.8 3.7" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path>'
-        : '<circle cx="14" cy="14" r="4.6" fill="#FFFFFF"></circle>';
+      ? `<text x="${EYE.cx}" y="${EYE.cy + 60}" text-anchor="middle" font-family="-apple-system, system-ui, sans-serif" font-size="200" font-weight="700" fill="#FFFFFF">${number}</text>`
+      : `<circle cx="${EYE.cx}" cy="${EYE.cy}" r="${EYE.r}" fill="#FFFFFF"></circle>`;
 
   return (
-    `<svg width="${size}" height="${height}" viewBox="0 0 28 36" fill="none">` +
-    `<path d="${TEARDROP}" fill="${TONE[tone] ?? TONE.ok}" stroke="#FFFFFF" stroke-width="1.8"></path>` +
+    `<svg width="${size}" height="${height}" viewBox="0 -960 960 960" fill="none">` +
+    `<path d="${TEARDROP}" fill="${TONE[tone] ?? TONE.ok}" stroke="#FFFFFF" stroke-width="46" paint-order="stroke"></path>` +
     `${inner}</svg>`
   );
 }

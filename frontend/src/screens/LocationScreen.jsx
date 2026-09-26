@@ -1,14 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import Icon from '../components/Icon.jsx';
 import MapCanvas from '../components/MapCanvas.jsx';
 import { Button, Sheet, Steps } from '../components/ui.jsx';
 import { CITY } from '../data/places.js';
 
-const SHEET = 320;
+const SHEET = 392;
 
-export default function LocationScreen({ theme, start, onConfirm, onHistory }) {
+export default function LocationScreen({ theme, start, onConfirm, onAddress, onHistory }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
+
+  // Адрес выбирают на отдельном экране — возвращаясь, переносим карту туда.
+  useEffect(() => {
+    if (start) setCoords(start);
+  }, [start]);
 
   return (
     <div className="screen screen--map">
@@ -18,6 +23,7 @@ export default function LocationScreen({ theme, start, onConfirm, onHistory }) {
         zoom={15}
         bottomInset={SHEET}
         centerPin
+        recenterKey={start?.join()}
         onCenterChange={setCoords}
       >
         <div className="chip-float drop" style={{ position: 'absolute', left: 16, top: 16 }}>
@@ -66,6 +72,10 @@ export default function LocationScreen({ theme, start, onConfirm, onHistory }) {
           </div>
 
           <Button className="mt-10" onClick={() => onConfirm(coords)}>Я здесь</Button>
+          <Button variant="secondary" onClick={onAddress}>
+            <Icon name="search" size={19} />
+            Ввести адрес
+          </Button>
         </Sheet>
       </MapCanvas>
     </div>
