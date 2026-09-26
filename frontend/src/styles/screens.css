@@ -195,16 +195,29 @@
 
 /* ── Таймлайн маршрута ─────────────────────────────────────── */
 
-.timeline { display: flex; flex-direction: column; }
+/* Линия рельса — одна на весь таймлайн, а не отрезок в каждой строке.
+   Отрезки центрировались каждый сам по себе и при дробном масштабе экрана
+   округлялись по-разному, отчего колонка выглядела рваной. */
+.timeline { position: relative; display: flex; flex-direction: column; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--grabber);
+}
 .timeline__stop { display: flex; gap: 14px; }
-.timeline__rail { width: 22px; flex-shrink: 0; display: flex; justify-content: center; }
+.timeline__rail { position: relative; z-index: 1; width: 22px; flex-shrink: 0; display: flex; justify-content: center; }
 .timeline__leg { display: flex; gap: 14px; align-items: center; height: 32px; }
-.timeline__line { width: 2px; height: 32px; background: var(--grabber); }
 .timeline__legText { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
 .timeline__title { font-size: 15px; font-weight: 650; }
 .timeline__sub { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 .timeline__sub--ok { color: var(--ok-text); font-weight: 600; }
 .timeline__mark { width: 14px; height: 14px; border: 4px solid var(--blue); border-radius: 50%; background: var(--surface); box-sizing: border-box; }
+.timeline__rail svg { background: var(--surface); }
 .timeline__mark--finish { width: 15px; height: 15px; border: 0; background: var(--ok-text); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
 
 /* ── Список и карточки истории ─────────────────────────────── */
