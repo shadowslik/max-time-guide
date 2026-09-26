@@ -1,6 +1,6 @@
 from aiomax import buttons
 
-from backend.app.config import *
+from config import *
 
 
 def how_use_bot():
