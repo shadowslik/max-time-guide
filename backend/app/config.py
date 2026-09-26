@@ -6,3 +6,10 @@ load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
 TOKEN = os.getenv("MAX_BOT_TOKEN").strip()
 BOT_USERNAME = (os.getenv("BOT_USERNAME") or "").strip().lstrip("@")
+
+ORS_API_KEY = (
+    os.getenv("VITE_ORS_API_KEY")
+    or ""
+).strip()
+
+MAPTILER_KEY = (os.getenv("VITE_MAPTILER_KEY") or "").strip()
