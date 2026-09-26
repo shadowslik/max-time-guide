@@ -1,27 +1,40 @@
-import MapCanvas from '../components/MapCanvas.jsx';
+import { useEffect, useState } from 'react';
+
 import Icon from '../components/Icon.jsx';
+import MapCanvas from '../components/MapCanvas.jsx';
 import { Button, Sheet, Steps } from '../components/ui.jsx';
 import { CITY } from '../data/places.js';
+import { hasGeocoder } from '../lib/geocoder.js';
 
-export default function LocationScreen({ theme, onConfirm, onPick, onHistory }) {
+// Без кнопки «Ввести адрес» шторке не нужна её высота.
+const SHEET = hasGeocoder ? 392 : 328;
+
+export default function LocationScreen({ theme, start, onConfirm, onAddress, onHistory }) {
+  const [coords, setCoords] = useState(start ?? CITY.start);
+
+  // Адрес выбирают на отдельном экране — возвращаясь, переносим карту туда.
+  useEffect(() => {
+    if (start) setCoords(start);
+  }, [start]);
+
   return (
     <div className="screen screen--map">
       <MapCanvas
         theme={theme}
-        center={CITY.user.coords}
-        zoom={CITY.zoom}
-        user={{ ...CITY.user, label: 'Ты здесь' }}
-        showHalo
-        fade
-        bottomInset={400}
+        center={coords}
+        zoom={15}
+        bottomInset={SHEET}
+        centerPin
+        recenterKey={start?.join()}
+        onCenterChange={setCoords}
       >
-        <div className="chip-float" style={{ position: 'absolute', left: 16, top: 16 }}>
+        <div className="chip-float drop" style={{ position: 'absolute', left: 16, top: 16 }}>
           <Steps current={1} />
         </div>
 
         <button
           type="button"
-          className="icon-button icon-button--float"
+          className="icon-button icon-button--float drop"
           style={{ position: 'absolute', right: 16, top: 10 }}
           onClick={onHistory}
           aria-label="Мои маршруты"
@@ -29,7 +42,7 @@ export default function LocationScreen({ theme, onConfirm, onPick, onHistory }) 
           <Icon name="history" size={21} />
         </button>
 
-        <Sheet height={400}>
+        <Sheet height={SHEET}>
           <div className="row">
             <div
               style={{
@@ -42,27 +55,33 @@ export default function LocationScreen({ theme, onConfirm, onPick, onHistory }) 
             </div>
             <div className="grow">
               <h1 style={{ margin: 0, fontSize: 21, fontWeight: 700, lineHeight: 1.24, letterSpacing: '-0.2px' }}>
-                {CITY.name}, {CITY.district}
+                Где ты сейчас?
               </h1>
               <p style={{ margin: '3px 0 0', fontSize: 13.5, color: 'var(--text-2)' }}>
-                Определили по сообщению в чате
+                {CITY.name}
               </p>
             </div>
           </div>
 
-          <div className="divider" style={{ margin: '20px 0' }} />
-
-          <div style={{ fontSize: 17, fontWeight: 650 }}>Всё верно?</div>
-          <p className="lead" style={{ marginTop: 7, fontSize: 15 }}>
-            Если точка указана неверно, подбор промахнётся на 10–15 минут пешком — а это половина твоего запаса.
+          <p className="lead" style={{ marginTop: 16, fontSize: 15 }}>
+            Двигай карту, чтобы метка встала на твоё место. От неё посчитаем, куда ты успеешь дойти и вернуться.
           </p>
 
           <div className="spacer" />
 
-          <Button onClick={onConfirm}>Да, продолжить</Button>
-          <Button variant="secondary" onClick={onPick} style={{ height: 54, fontSize: 17 }}>
-            Нет, укажу на карте
-          </Button>
+          <div className="coords num">
+            {coords[1].toFixed(4)}, {coords[0].toFixed(4)}
+          </div>
+
+          <Button className="mt-10" onClick={() => onConfirm(coords)}>Я здесь</Button>
+          {/* Без ключа геокодера искать нечем — кнопку не показываем,
+              чтобы она не вела на пустой экран. */}
+          {hasGeocoder && (
+            <Button variant="secondary" onClick={onAddress}>
+              <Icon name="search" size={19} />
+              Ввести адрес
+            </Button>
+          )}
         </Sheet>
       </MapCanvas>
     </div>

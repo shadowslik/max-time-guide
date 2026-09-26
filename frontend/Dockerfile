@@ -9,11 +9,11 @@ COPY . .
 
 # Vite подставляет переменные VITE_* во время СБОРКИ, а не во время запуска,
 # поэтому ключи приходят аргументами сборки, а не через env_file контейнера.
-# Без них приложение работает: карта откатывается на схематичную.
-ARG VITE_YANDEX_MAPS_API_KEY=""
-ARG VITE_YANDEX_ROUTER_API_KEY=""
-ENV VITE_YANDEX_MAPS_API_KEY=$VITE_YANDEX_MAPS_API_KEY
-ENV VITE_YANDEX_ROUTER_API_KEY=$VITE_YANDEX_ROUTER_API_KEY
+# Оба необязательны: без них карта берёт тайлы OSM, а маршрут рисуется прямой.
+ARG VITE_ORS_API_KEY=""
+ARG VITE_MAPTILER_KEY=""
+ENV VITE_ORS_API_KEY=$VITE_ORS_API_KEY
+ENV VITE_MAPTILER_KEY=$VITE_MAPTILER_KEY
 
 RUN npm run build                # результат в /app/dist
 

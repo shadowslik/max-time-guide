@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 
 import Icon from '../components/Icon.jsx';
-import MapCanvas, { schemaRoute } from '../components/MapCanvas.jsx';
+import MapCanvas from '../components/MapCanvas.jsx';
 import MapPin, { toneForStatus } from '../components/MapPin.jsx';
 import TimeBudgetBar from '../components/TimeBudgetBar.jsx';
 import Timeline from '../components/Timeline.jsx';
@@ -15,7 +15,6 @@ import { CITY, INTERESTS } from '../data/places.js';
 import { addMinutes, clock, formatBudget, interestsLabel, plural } from '../lib/format.js';
 import { externalRouteUrl, fetchRouteDetails } from '../lib/router.js';
 import { openExternal } from '../lib/maxBridge.js';
-import { toLatLon } from '../lib/ymaps.js';
 
 const badgeTone = (status) => (status === 'fits' ? 'ok' : status === 'tight' ? 'warn' : 'muted');
 const statusLabel = (status) => (status === 'fits' ? 'Успеваешь' : status === 'tight' ? 'Впритык' : 'Не успеешь');
@@ -34,7 +33,7 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
         style={{ border: 0, background: 'none', padding: 0, width: '100%', textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
         onClick={onOpenPlace}
       >
-        <div className="row row--top">
+        <div className="row">
           <div className="grow">
             <div className="row">
               <h2 className="title-s">{selected.name}</h2>
@@ -44,7 +43,7 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
               {interestsLabel(selected.interests, INTERESTS)} · {selected.price} · {selected.hours}
             </div>
           </div>
-          <span style={{ flexShrink: 0, color: 'var(--chevron)', marginTop: 3, display: 'flex' }}>
+          <span style={{ flexShrink: 0, color: 'var(--chevron)', display: 'flex' }}>
             <Icon name="chevronRight" size={20} />
           </span>
         </div>
@@ -132,7 +131,7 @@ function ChainPanel({ chain, minutes, startAt, onOpen }) {
 }
 
 export default function ResultsScreen({
-  theme, minutes, interests, results, selected, chain, mode, startAt,
+  theme, start, minutes, interests, results, selected, chain, mode, startAt,
   onSelect, onOpenPlace, onRoute, onEdit, onBack, onMode,
 }) {
   const chainMode = mode === 'chain' && Boolean(chain);
@@ -148,7 +147,7 @@ export default function ResultsScreen({
 
   // Точки обхода для режима цепочки: старт → места → обратно.
   const chainPoints = chainMode
-    ? [CITY.user.coords, ...chain.legs.map((leg) => leg.place.coords), CITY.user.coords]
+    ? [start, ...chain.legs.map((leg) => leg.place.coords), start]
     : null;
   const [chainRoute, setChainRoute] = useState(null);
 
@@ -157,7 +156,7 @@ export default function ResultsScreen({
       setChainRoute(null);
       return undefined;
     }
-    setChainRoute(chainPoints.map(toLatLon));
+    setChainRoute(chainPoints);
     let alive = true;
     fetchRouteDetails(chainPoints).then((details) => {
       if (alive && details) setChainRoute(details.line);
@@ -172,7 +171,6 @@ export default function ResultsScreen({
     ? chain.legs.map((leg, index) => ({
         id: leg.place.id,
         coords: leg.place.coords,
-        pin: leg.place.pin,
         tone: 'ok',
         size: 38,
         number: index + 1,
@@ -184,11 +182,9 @@ export default function ResultsScreen({
         return {
           id: place.id,
           coords: place.coords,
-          pin: place.pin,
           title: place.name,
           tone: toneForStatus(place.eval.status),
           size: active ? 40 : place.eval.status === 'no' ? 24 : 30,
-          glyph: active ? 'museum' : undefined,
           label: active ? `${place.short} · ${place.walkTo} мин` : undefined,
           labelTone: 'dark',
         };
@@ -198,14 +194,12 @@ export default function ResultsScreen({
     <div className="screen screen--map">
       <MapCanvas
         theme={theme}
-        center={chainMode ? chain.legs[0].place.coords : selected?.coords ?? CITY.user.coords}
+        center={chainMode ? chain.legs[0].place.coords : selected?.coords ?? start}
         zoom={chainMode ? 14 : CITY.zoom}
-        user={CITY.user}
+        user={{ coords: start }}
         markers={markers}
         route={chainMode ? chainRoute : undefined}
-        routeSchema={chainMode ? [CITY.user.pin, ...chain.legs.map((l) => l.place.pin), CITY.user.pin] : undefined}
-        focus={chainMode ? undefined : selected?.pin}
-        fit={chainMode ? chainPoints : [CITY.user.coords, selected?.coords]}
+        fit={chainMode ? chainPoints : [start, selected?.coords]}
         bottomInset={chainMode ? 300 : 300}
         onSelect={chainMode ? undefined : onSelect}
       >

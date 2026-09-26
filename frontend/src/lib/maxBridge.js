@@ -16,13 +16,6 @@ export function detectColorScheme() {
   return 'light';
 }
 
-export function detectPlatform() {
-  const platform = bridge()?.platform;
-  if (platform === 'ios' || platform === 'android') return platform;
-  if (typeof navigator === 'undefined') return 'ios';
-  return /android/i.test(navigator.userAgent) ? 'android' : 'ios';
-}
-
 // Подписка на смену темы: и на события MAX, и на системную медиа-запрос.
 export function onColorSchemeChange(handler) {
   const cleanups = [];

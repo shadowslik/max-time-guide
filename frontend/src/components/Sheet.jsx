@@ -9,12 +9,38 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 const DISMISS_GAP = 64; // насколько ниже нижнего снапа нужно утянуть, чтобы закрыть
 const FLING = 0.5; // px/ms — с этой скорости считаем жест броском, а не перетаскиванием
 
+// Высота окна на первом кадре бывает нулевой (webview ещё не разложил
+// страницу). Считать от неё один раз нельзя — шторка схлопнется в ноль
+// и уже не починится, потому что пересчитывать будет нечему.
+function useViewportHeight() {
+  const [value, setValue] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight || 800,
+  );
+
+  useEffect(() => {
+    const update = () => setValue(window.innerHeight || 800);
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+    };
+  }, []);
+
+  return value;
+}
+
 export default function Sheet({ height, snap, onDismiss, fill, children, className = '', style }) {
+  const viewport = useViewportHeight();
+
   const points = useMemo(() => {
-    const limit = typeof window === 'undefined' ? 720 : window.innerHeight * 0.88;
+    // Нижняя граница страхует от нулевого окна, верхняя не даёт шторке
+    // закрыть экран целиком.
+    const limit = Math.max(320, viewport * 0.88);
     const raw = snap ?? (height ? [height] : [360]);
     return [...new Set(raw.map((v) => Math.round(Math.min(v, limit))))].sort((a, b) => a - b);
-  }, [snap, height]);
+  }, [snap, height, viewport]);
 
   const max = points[points.length - 1];
   const stops = useMemo(() => points.map((p) => max - p).sort((a, b) => a - b), [points, max]);
@@ -23,6 +49,21 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
   const [offset, setOffset] = useState(() => max - points[0]);
   const [dragging, setDragging] = useState(false);
   const gesture = useRef(null);
+  const wrapRef = useRef(null);
+
+  // Карта должна знать, сколько её закрыто шторкой: по этой величине
+  // отодвигается обязательный копирайт OSM. Пишем напрямую в CSS-переменную,
+  // без состояния — значение меняется на каждом кадре перетаскивания.
+  useEffect(() => {
+    const host = wrapRef.current?.closest('.map');
+    if (!host) return undefined;
+    host.style.setProperty('--sheet-h', `${Math.max(0, max - offset)}px`);
+    host.classList.toggle('map--sheet-dragging', dragging);
+    return () => {
+      host.style.removeProperty('--sheet-h');
+      host.classList.remove('map--sheet-dragging');
+    };
+  }, [offset, max, dragging]);
 
   // Снапы могли пересчитаться (поворот экрана, другой набор точек) — подтягиваем позицию.
   useEffect(() => {
@@ -91,7 +132,7 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
 
   if (fill) {
     return (
-      <div className="sheet-wrap" style={style}>
+      <div className="sheet-wrap" ref={wrapRef} style={style}>
         <div className={`sheet sheet--fill ${className}`.trim()}>
           <span className="grabber" />
           {children}
@@ -102,6 +143,7 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
 
   return (
     <div
+      ref={wrapRef}
       className={`sheet-wrap${draggable ? ' sheet-wrap--draggable' : ''}${dragging ? ' sheet-wrap--dragging' : ''}`}
       style={{ transform: `translate3d(0, ${offset}px, 0)`, ...style }}
       {...handlers}

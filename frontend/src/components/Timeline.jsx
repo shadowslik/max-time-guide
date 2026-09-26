@@ -12,7 +12,7 @@ function Mark({ item }) {
       </span>
     );
   }
-  return <MapPin tone="ok" size={18} number={item.number} glyph={item.glyph} />;
+  return <MapPin tone="ok" size={18} number={item.number} />;
 }
 
 export default function Timeline({ items }) {
@@ -21,9 +21,9 @@ export default function Timeline({ items }) {
       {items.map((item, index) =>
         item.type === 'leg' ? (
           <div className="timeline__leg" key={index}>
-            <div className="timeline__rail">
-              <span className="timeline__line" />
-            </div>
+            {/* Рельс держит колонку, саму линию рисует .timeline::before —
+                одной сплошной полосой, чтобы отрезки не разъезжались. */}
+            <div className="timeline__rail" />
             <div className="timeline__legText">
               <Icon name="walk" size={16} />
               {item.text}

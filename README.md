@@ -52,6 +52,13 @@
 - ── .gitignore
 - ── README.md
 
+## Документация
+
+- [API.md](API.md) — контракт между mini-app и бэкендом: ручки, форматы,
+  примеры `fetch()` и порядок переезда логики подбора на сервер.
+- [DEPLOY.md](DEPLOY.md) — развёртывание.
+- [frontend/README.md](frontend/README.md) — устройство mini-app.
+
 ## Запуск (Docker, одна команда)
 
 ```bash

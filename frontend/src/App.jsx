@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { MaxUI } from '@maxhub/max-ui';
 
 import { Overlay, ScreenStack } from './components/ScreenStack.jsx';
 import LocationScreen from './screens/LocationScreen.jsx';
-import LocationPickScreen from './screens/LocationPickScreen.jsx';
+import AddressScreen from './screens/AddressScreen.jsx';
 import TimeScreen from './screens/TimeScreen.jsx';
 import TimeCustomSheet from './screens/TimeCustomSheet.jsx';
 import InterestsScreen from './screens/InterestsScreen.jsx';
@@ -17,7 +16,8 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 
 import { CITY, HISTORY, PLACES, TIME_OPTIONS } from './data/places.js';
 import { BUFFER, buildChain, pickPlaces } from './lib/planner.js';
-import { detectColorScheme, detectPlatform, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
+import { walkMinutes } from './lib/geo.js';
+import { detectColorScheme, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
 import { formatDate } from './lib/format.js';
 
 const DEFAULT_MINUTES = 120;
@@ -25,7 +25,6 @@ const DEFAULT_INTERESTS = ['history', 'arch'];
 
 export default function App() {
   const [scheme, setScheme] = useState(detectColorScheme);
-  const [platform] = useState(detectPlatform);
 
   const [stack, setStack] = useState(['location']);
   const [sheet, setSheet] = useState(null);
@@ -35,6 +34,7 @@ export default function App() {
   const [results, setResults] = useState([]);
   const [chain, setChain] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [start, setStart] = useState(CITY.start);
   const [mode, setMode] = useState('single');
   const [startAt, setStartAt] = useState(() => new Date());
   const [history, setHistory] = useState(HISTORY);
@@ -56,6 +56,12 @@ export default function App() {
     directionRef.current = 'push';
     setStack(names);
   }, []);
+  // Подменить верхний экран, сохранив всё, что под ним. Именно этого не хватало:
+  // подбор раньше затирал стек целиком, и с результатов некуда было вернуться.
+  const swap = useCallback((name) => {
+    directionRef.current = 'push';
+    setStack((s) => [...s.slice(0, -1), name]);
+  }, []);
 
   useEffect(() => {
     notifyReady();
@@ -68,22 +74,27 @@ export default function App() {
 
   // Предварительный подбор под текущие параметры — нужен шторке «Изменить подбор»,
   // чтобы кнопка сразу показывала, сколько мест получится.
-  const preview = useMemo(() => pickPlaces(minutes, interests), [minutes, interests]);
+  const preview = useMemo(() => pickPlaces(minutes, interests, start), [minutes, interests, start]);
 
   const runSearch = useCallback(
     (nextMinutes = minutes, nextInterests = interests) => {
       setMinutes(nextMinutes);
       setInterests(nextInterests);
       setStartAt(new Date());
-      const found = pickPlaces(nextMinutes, nextInterests);
+      const found = pickPlaces(nextMinutes, nextInterests, start);
       setResults(found);
-      setChain(buildChain(nextMinutes, nextInterests));
+      setChain(buildChain(nextMinutes, nextInterests, start));
       setSelectedId(found.find((p) => p.eval.status !== 'no')?.id ?? found[0]?.id ?? null);
       setMode('single');
       setSheet(null);
-      replace('loading');
+      // Повторный подбор подменяет текущий экран, первый — добавляется поверх.
+      setStack((s) => {
+        const top = s[s.length - 1];
+        directionRef.current = 'push';
+        return ['loading', 'results', 'nofit'].includes(top) ? [...s.slice(0, -1), 'loading'] : [...s, 'loading'];
+      });
     },
-    [minutes, interests, replace],
+    [minutes, interests, start],
   );
 
   const toggleInterest = (id) =>
@@ -132,7 +143,8 @@ export default function App() {
       const place = PLACES.find((p) => p.id === trip.placeId);
       if (!place) return;
 
-      const needed = place.walkTo + place.idealVisit + place.walkBack + BUFFER;
+      const walk = walkMinutes(start, place.coords);
+      const needed = walk * 2 + place.idealVisit + BUFFER;
       const option = TIME_OPTIONS.find((o) => o.minutes >= needed);
       const nextMinutes = option ? option.minutes : Math.ceil(needed / 15) * 15;
       const nextInterests = trip.interests?.length ? trip.interests : interests;
@@ -140,12 +152,13 @@ export default function App() {
       setMinutes(nextMinutes);
       setInterests(nextInterests);
       setStartAt(new Date());
-      setResults(pickPlaces(nextMinutes, nextInterests));
-      setChain(buildChain(nextMinutes, nextInterests));
+      setResults(pickPlaces(nextMinutes, nextInterests, start));
+      setChain(buildChain(nextMinutes, nextInterests, start));
       setSelectedId(place.id);
-      replace('results', 'route');
+      // Из истории путь назад должен вести к карте, а не в тупик.
+      replace('location', 'results', 'route');
     },
-    [interests, replace],
+    [interests, start, replace],
   );
 
   const fitsCount = results.filter((p) => p.eval.status !== 'no').length;
@@ -156,9 +169,6 @@ export default function App() {
 
   const body = () => {
     switch (screen) {
-      case 'locationPick':
-        return <LocationPickScreen theme={scheme} onConfirm={() => replace('location', 'time')} onBack={back} />;
-
       case 'time':
         return (
           <TimeScreen
@@ -190,7 +200,7 @@ export default function App() {
             interests={interests}
             found={results.length}
             fits={fitsCount}
-            onDone={() => replace('interests', fitsCount ? 'results' : 'nofit')}
+            onDone={() => swap(fitsCount ? 'results' : 'nofit')}
           />
         );
 
@@ -198,6 +208,7 @@ export default function App() {
         return (
           <ResultsScreen
             theme={scheme}
+            start={start}
             minutes={minutes}
             interests={interests}
             results={results}
@@ -233,6 +244,7 @@ export default function App() {
         return (
           <RouteScreen
             theme={scheme}
+            start={start}
             place={selected}
             minutes={minutes}
             startAt={startAt}
@@ -249,9 +261,20 @@ export default function App() {
             nearest={nearest}
             suggestion={pickPlaces(minutes + 30, interests).filter((p) => p.eval.status !== 'no').length}
             onAddTime={() => runSearch(minutes + 30, interests)}
-            onEditInterests={() => replace('location', 'time', 'interests')}
-            onShowAnyway={() => replace('interests', 'results')}
-            onBack={() => replace('location', 'time')}
+            onEditInterests={back}
+            onShowAnyway={() => swap('results')}
+            onBack={back}
+          />
+        );
+
+      case 'address':
+        return (
+          <AddressScreen
+            onPick={(coords) => {
+              setStart(coords);
+              back();
+            }}
+            onBack={back}
           />
         );
 
@@ -270,8 +293,12 @@ export default function App() {
         return (
           <LocationScreen
             theme={scheme}
-            onConfirm={() => go('time')}
-            onPick={() => go('locationPick')}
+            start={start}
+            onConfirm={(coords) => {
+              setStart(coords);
+              go('time');
+            }}
+            onAddress={() => go('address')}
             onHistory={() => go('history')}
           />
         );
@@ -279,7 +306,6 @@ export default function App() {
   };
 
   return (
-    <MaxUI platform={platform} colorScheme={scheme} style={{ display: 'contents' }}>
       <div className="app">
         <ScreenStack screenKey={screen} direction={directionRef.current}>
           {body()}
@@ -315,6 +341,5 @@ export default function App() {
           />
         </Overlay>
       </div>
-    </MaxUI>
   );
 }

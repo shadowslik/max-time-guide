@@ -3,22 +3,49 @@
 /* ── Карта ─────────────────────────────────────────────────── */
 
 .map { position: absolute; inset: 0; overflow: hidden; background: var(--map-bg); }
-.map__canvas { position: absolute; inset: 0; }
-.map__fade {
-  position: absolute; left: 0; top: 0; right: 0; height: 120px; pointer-events: none;
-  background: linear-gradient(180deg, var(--map-fade, rgba(255, 255, 255, 0.8)), transparent);
+/* maplibre-gl.css задаёт контейнеру position: relative и перебивает наш
+   inset: 0 — блок схлопывается в нулевую высоту. Поэтому размер задаём явно
+   и с большей специфичностью. */
+.map .map__canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
-[data-theme='dark'] .map__fade { --map-fade: rgba(20, 21, 25, 0.92); }
 
-.map-overlay { position: absolute; inset: 0; pointer-events: none; }
+.map-overlay { position: absolute; inset: 0; z-index: 3; pointer-events: none; }
 .map-overlay > * { pointer-events: auto; }
 
-.pin { position: absolute; transform: translate(-50%, -100%); border: 0; padding: 0; background: none; cursor: pointer; line-height: 0; }
-.pin--muted { opacity: 0.75; }
+/* MapLibre сам позиционирует метки, поэтому внутри никаких transform. */
+.map-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  line-height: 0;
+  cursor: pointer;
+}
+.map-pin--muted { opacity: 0.75; }
+.map-pin:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 3px; border-radius: 6px; }
+
+.map-user { position: relative; display: flex; align-items: center; justify-content: center; }
+.map-user__dot {
+  width: 20px; height: 20px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: var(--shadow-pin);
+}
+.map-user__halo {
+  position: absolute;
+  width: 132px; height: 132px;
+  border: 1px solid rgba(47, 107, 255, 0.32);
+  border-radius: 50%;
+  background: rgba(47, 107, 255, 0.13);
+}
+.map-user__label { position: absolute; bottom: 28px; white-space: nowrap; }
 
 .pin-label {
-  position: absolute;
-  transform: translate(-50%, -100%);
   padding: 5px 11px;
   border-radius: 999px;
   background: var(--surface);
@@ -31,26 +58,45 @@
 .pin-label--dark { background: var(--tooltip-bg); color: var(--tooltip-fg); font-size: 12px; }
 .pin-label--accent { color: var(--accent-text); font-size: 12.5px; }
 
-.user-dot {
-  position: absolute;
-  width: 20px; height: 20px;
-  margin: -10px 0 0 -10px;
-  border: 3px solid #FFFFFF;
-  border-radius: 50%;
-  background: var(--blue);
-  box-shadow: var(--shadow-pin);
+/* Метка-перекрестие: стоит в центре ВИДИМОЙ части карты, а не всего холста,
+   потому что низ закрыт шторкой. Карта об этом знает через свой padding,
+   поэтому getCenter() указывает ровно сюда. */
+.center-pin {
+  position: absolute; left: 50%; top: calc(50% - var(--sheet-h, 0px) / 2);
+  transform: translate(-50%, -100%);
+  color: var(--accent-text);
+  line-height: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(16, 17, 20, 0.25));
 }
-.user-halo {
-  position: absolute;
-  width: 132px; height: 132px;
-  margin: -66px 0 0 -66px;
-  border: 1px solid rgba(47, 107, 255, 0.32);
+.center-pin__shadow {
+  position: absolute; left: 50%; top: calc(50% - var(--sheet-h, 0px) / 2);
+  width: 38px; height: 10px;
+  margin-left: -19px;
   border-radius: 50%;
-  background: rgba(47, 107, 255, 0.13);
+  background: rgba(16, 17, 20, 0.2);
+  pointer-events: none;
 }
 
-.center-pin { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -100%); color: var(--accent-text); line-height: 0; }
-.center-pin__shadow { position: absolute; left: 50%; top: 50%; width: 38px; height: 10px; margin-left: -19px; border-radius: 50%; background: rgba(16, 17, 20, 0.2); }
+/* Атрибуция обязательна по условиям OSM — не даём шторке её закрыть.
+   Высоту шторки она сообщает сама, в том числе пока её тянут. */
+.map .maplibregl-ctrl-bottom-right,
+.map .maplibregl-ctrl-bottom-left {
+  bottom: calc(var(--sheet-h, 0px) + 6px);
+  z-index: 4;
+  transition: bottom 300ms var(--ease-out, ease);
+}
+/* Во время жеста переход мешает: значок должен идти ровно за пальцем. */
+.map--sheet-dragging .maplibregl-ctrl-bottom-right,
+.map--sheet-dragging .maplibregl-ctrl-bottom-left {
+  transition: none;
+}
+
+/* У растровых тайлов нет тёмной схемы — инвертируем сам холст.
+   Метки и плашки лежат отдельными элементами и не затрагиваются. */
+[data-theme='dark'] .map--raster .maplibregl-canvas {
+  filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.7);
+}
 
 /* ── Плашка параметров и легенда ───────────────────────────── */
 
@@ -134,7 +180,6 @@
 /* ── Карточка места ────────────────────────────────────────── */
 
 .hero { position: absolute; top: 0; left: 0; right: 0; height: 300px; overflow: hidden; background: #EFE9DE; }
-.hero__note { position: absolute; right: 16px; top: 22px; padding: 6px 12px; border-radius: 999px; background: rgba(16, 17, 20, 0.72); color: #FFFFFF; font-size: 11.5px; font-weight: 600; }
 
 .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .info-card { border-radius: 14px; background: var(--surface-3); padding: 12px 10px; display: flex; flex-direction: column; gap: 6px; }
@@ -150,16 +195,29 @@
 
 /* ── Таймлайн маршрута ─────────────────────────────────────── */
 
-.timeline { display: flex; flex-direction: column; }
+/* Линия рельса — одна на весь таймлайн, а не отрезок в каждой строке.
+   Отрезки центрировались каждый сам по себе и при дробном масштабе экрана
+   округлялись по-разному, отчего колонка выглядела рваной. */
+.timeline { position: relative; display: flex; flex-direction: column; }
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 10px;
+  bottom: 10px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--grabber);
+}
 .timeline__stop { display: flex; gap: 14px; }
-.timeline__rail { width: 22px; flex-shrink: 0; display: flex; justify-content: center; }
+.timeline__rail { position: relative; z-index: 1; width: 22px; flex-shrink: 0; display: flex; justify-content: center; }
 .timeline__leg { display: flex; gap: 14px; align-items: center; height: 32px; }
-.timeline__line { width: 2px; height: 32px; background: var(--grabber); }
 .timeline__legText { display: flex; align-items: center; gap: 8px; color: var(--text-2); font-size: 13px; }
 .timeline__title { font-size: 15px; font-weight: 650; }
 .timeline__sub { font-size: 12.5px; color: var(--text-2); margin-top: 1px; }
 .timeline__sub--ok { color: var(--ok-text); font-weight: 600; }
 .timeline__mark { width: 14px; height: 14px; border: 4px solid var(--blue); border-radius: 50%; background: var(--surface); box-sizing: border-box; }
+.timeline__rail svg { background: var(--surface); }
 .timeline__mark--finish { width: 15px; height: 15px; border: 0; background: var(--ok-text); color: #FFFFFF; display: flex; align-items: center; justify-content: center; }
 
 /* ── Список и карточки истории ─────────────────────────────── */
@@ -211,52 +269,132 @@
 .readout__value { font-size: 46px; font-weight: 700; letter-spacing: -1.4px; line-height: 1; }
 .readout__sub { margin-top: 9px; font-size: 14px; color: var(--text-2); }
 
-/* ── Поиск ─────────────────────────────────────────────────── */
 
-.search { display: flex; align-items: center; gap: 10px; height: 44px; box-sizing: border-box; padding: 0 14px; border-radius: 14px; background: var(--surface); box-shadow: var(--shadow-float); color: var(--text-3); }
-.search__input { width: 100%; border: 0; outline: 0; background: transparent; font: inherit; font-size: 15px; color: var(--text); }
 
 .mt-4 { margin-top: 4px; } .mt-6 { margin-top: 6px; } .mt-8 { margin-top: 8px; }
 .mt-10 { margin-top: 10px; } .mt-12 { margin-top: 12px; } .mt-14 { margin-top: 14px; }
 .mt-16 { margin-top: 16px; } .mt-18 { margin-top: 18px; } .mt-20 { margin-top: 20px; }
 .mt-22 { margin-top: 22px; } .mt-24 { margin-top: 24px; } .mt-26 { margin-top: 26px; }
 .row { display: flex; align-items: center; gap: 10px; }
-.row--top { align-items: flex-start; }
 .grow { flex-grow: 1; min-width: 0; }
 
-/* ── Метки поверх настоящих Яндекс.Карт (JS API 2.1) ───────── */
 
-.ymx-pin {
+/* Координаты метки: геокодера нет, поэтому показываем то, что знаем честно. */
+.coords {
+  font-size: 12.5px;
+  color: var(--text-3);
+  text-align: center;
+  letter-spacing: 0.2px;
+}
+
+/* ── Поле ввода адреса ─────────────────────────────────────── */
+
+.field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border: 1.5px solid var(--sep);
+  border-radius: var(--radius-button);
+  background: var(--surface-2);
+}
+.field:focus-within { border-color: var(--accent-text); background: var(--surface); }
+.field__icon { flex-shrink: 0; color: var(--text-3); }
+.field__input {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+}
+.field__input::placeholder { color: var(--text-4); }
+.field__clear {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%;
+  background: var(--grabber);
+  color: var(--surface);
+  cursor: pointer;
+}
+
+.hint-line { margin: 0; text-align: center; font-size: 13.5px; line-height: 1.45; color: var(--text-3); }
+
+/* Индикатор подбора: кольцо крутится вокруг иконки Material Symbols. */
+.loader {
   position: relative;
-  transform: translate(-50%, -100%);
+  width: 132px; height: 132px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+.loader__ring {
+  position: absolute;
+  inset: 0;
+  border: 5px solid var(--bar-buffer);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: ryadom-spin 1.1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) { .loader__ring { animation: none; } }
+
+/* ── Схема «не успеваешь» ──────────────────────────────────── */
+
+.reach {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  /* снизу запас под подпись, которая висит под кружком */
+  padding: 20px 16px 44px;
+  border-radius: 22px;
+  background: var(--surface-3);
+}
+.reach__circle {
+  position: relative;
+  flex-shrink: 0;
+  width: 128px; height: 128px;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed var(--dashed);
+  border-radius: 50%;
+  background: var(--track);
+}
+.reach__dot {
+  width: 22px; height: 22px;
+  border: 3px solid #FFFFFF;
+  border-radius: 50%;
+  background: var(--blue);
+  box-shadow: var(--shadow-pin);
+}
+.reach__link {
+  flex-shrink: 0;
+  width: 46px;
+  border-top: 3px dotted var(--chevron);
+}
+.reach__far {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  line-height: 0;
+  gap: 2px;
+  color: var(--muted-pin);
 }
-.ymx-pin--muted { opacity: 0.75; }
-.ymx-pin__label { position: static; transform: none; }
-.ymx-user { position: relative; }
-.ymx-user__dot { position: absolute; left: 0; top: 0; }
-
-/* У карты свой z-index стек — держим плашки и шторку выше тайлов. */
-.map__canvas .ymaps-2-1-79-map { position: absolute; inset: 0; }
-.map-overlay { z-index: 3; }
-.map__fade { z-index: 2; }
-
-.ymx-user__halo, .ymx-user__dot { left: 0; top: 0; }
-.ymx-user__label { position: absolute; left: 0; top: -18px; }
-
-/* Копирайт Яндекса обязателен к показу — не даём шторке его закрыть.
-   Класс версионный (ymaps-2-1-79-…), поэтому цепляемся по подстроке. */
-.map [class*='copyrights-pane'] {
-  bottom: calc(var(--sheet-h, 0px) + 8px) !important;
-  z-index: 4;
+.reach__caption {
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-2);
+  text-align: center;
 }
-
-/* У JS API 2.1 нет тёмной схемы карты. Инвертируем только слой тайлов
-   (ground-pane) — метки, подписи наших плашек и копирайт остаются как есть. */
-[data-theme='dark'] .map [class*='ground-pane'] {
-  filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.7);
+.reach__circle .reach__caption {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
 }

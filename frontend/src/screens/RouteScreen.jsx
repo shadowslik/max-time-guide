@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react';
 
 import Icon from '../components/Icon.jsx';
-import MapCanvas, { schemaRoute } from '../components/MapCanvas.jsx';
+import MapCanvas from '../components/MapCanvas.jsx';
 import Timeline from '../components/Timeline.jsx';
 import { Badge, Button, Sheet } from '../components/ui.jsx';
-import { CITY } from '../data/places.js';
 import { addMinutes, clock, formatBudget } from '../lib/format.js';
-import { toLatLon } from '../lib/ymaps.js';
 import { externalRouteUrl, fetchRouteDetails } from '../lib/router.js';
 import { openExternal } from '../lib/maxBridge.js';
 
-export default function RouteScreen({ theme, place, minutes, startAt, onBack, onEdit }) {
-  const points = [CITY.user.coords, place.coords];
+export default function RouteScreen({ theme, start, place, minutes, startAt, onBack, onEdit }) {
+  const points = [start, place.coords];
   // Пока Routing API не ответил (или ключа нет) показываем прямую линию —
   // направление читается сразу, а реальная геометрия подменит её позже.
-  const [route, setRoute] = useState(() => points.map(toLatLon));
+  // Пока маршрут не построен (или ключа ORS нет) показываем прямую линию:
+  // направление читается сразу, а реальная геометрия подменит её позже.
+  const [route, setRoute] = useState(() => points);
 
   useEffect(() => {
     let alive = true;
@@ -57,12 +57,10 @@ export default function RouteScreen({ theme, place, minutes, startAt, onBack, on
         theme={theme}
         center={place.coords}
         zoom={15}
-        user={CITY.user}
-        markers={[{ id: place.id, coords: place.coords, pin: place.pin, tone: 'ok', size: 40, glyph: 'museum', title: place.name }]}
+        user={{ coords: start }}
+        markers={[{ id: place.id, coords: place.coords, tone: 'ok', size: 40, title: place.name }]}
         route={route}
-        routeSchema={schemaRoute(CITY.user.pin, place.pin)}
         fit={points}
-        focus={{ x: (CITY.user.pin.x + place.pin.x) / 2, y: (CITY.user.pin.y + place.pin.y) / 2 }}
         bottomInset={430}
       >
         <div style={{ position: 'absolute', left: 16, top: 16, display: 'flex', gap: 10 }}>

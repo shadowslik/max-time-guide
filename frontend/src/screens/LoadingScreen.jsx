@@ -33,18 +33,9 @@ export default function LoadingScreen({ theme, minutes, interests, found, fits, 
   return (
     <Screen className="screen--loading" style={{ alignItems: 'center' }}>
       <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', paddingTop: 60 }}>
-        <div style={{ position: 'relative', width: 132, height: 132 }}>
-          <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'var(--accent-soft)' }} />
-          <svg width="132" height="132" viewBox="0 0 132 132" fill="none" style={{ position: 'absolute', inset: 0 }} aria-hidden="true">
-            <circle cx="66" cy="66" r="60" stroke="var(--bar-buffer)" strokeWidth="5" />
-            <g className="spin" style={{ transformOrigin: '66px 66px' }}>
-              <path d="M66 6a60 60 0 0 1 52 30" stroke={accent} strokeWidth="5" strokeLinecap="round" />
-            </g>
-            <path d="M40 92c14 2 18-10 30-12s16-14 24-16" stroke={accent} strokeWidth="3" strokeLinecap="round" strokeDasharray="1 7" />
-            <circle cx="40" cy="92" r="5.5" fill={accent} />
-            <path d="M94 50c5.4 0 9.8 4.4 9.8 9.8 0 6.6-8.2 14.3-9.3 15.2a.8.8 0 0 1-1.1 0c-1.1-.9-9.3-8.6-9.3-15.2 0-5.4 4.4-9.8 9.9-9.8Z" fill={accent} />
-            <circle cx="94" cy="59.8" r="3.7" fill="var(--accent-soft)" />
-          </svg>
+        <div className="loader">
+          <span className="loader__ring" />
+          <Icon name="explore" size={56} />
         </div>
 
         <h1 className="title-l mt-26" style={{ fontSize: 26 }}>Подбираем места…</h1>
