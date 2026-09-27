@@ -13,3 +13,6 @@ ORS_API_KEY = (
 ).strip()
 
 MAPTILER_KEY = (os.getenv("VITE_MAPTILER_KEY") or "").strip()
+
+# DaData — подсказки российских адресов (улица → дом), бесплатный тариф
+DADATA_TOKEN = (os.getenv("DADATA_TOKEN") or "").strip()

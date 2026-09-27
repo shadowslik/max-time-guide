@@ -8,13 +8,63 @@ from urllib.parse import quote
 
 import httpx
 
-from backend.app.config import MAPTILER_KEY
+from backend.app.config import MAPTILER_KEY, DADATA_TOKEN
 from backend.app.data.places import CITY_CENTER
 from backend.app.models.schemas import GeocodeResult
 
 log = logging.getLogger(__name__)
 TIMEOUT = 12.0
 USER_AGENT = "max-time-guide/1.0"
+DADATA_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address"
+
+
+async def _dadata(q: str, limit: int):
+    """Подсказки российских адресов (улица → дом), как в Яндекс.Картах."""
+    if not DADATA_TOKEN:
+        return None
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Token {DADATA_TOKEN}",
+    }
+    body = {"query": q, "count": limit, "locations": [{"country": "Россия"}]}
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            r = await client.post(DADATA_URL, headers=headers, json=body)
+            if r.status_code != 200:
+                log.warning("dadata %s", r.status_code)
+                return None
+            data = r.json()
+    except Exception as e:
+        log.warning("dadata fail: %s", e)
+        return None
+
+    out: List[GeocodeResult] = []
+    for s in data.get("suggestions", []):
+        d = s.get("data") or {}
+        lat, lon = d.get("geo_lat"), d.get("geo_lon")
+        if not lat or not lon:
+            continue  # без координат метку не поставить
+        value = s.get("value") or ""
+        street = d.get("street_with_type") or ""
+        house = d.get("house") or ""
+        if street:
+            title = f"{street}, {house}".strip(", ") if house else street
+        else:
+            title = d.get("city_with_type") or d.get("region_with_type") or value
+        subtitle = ", ".join(
+            p for p in (d.get("city_with_type"), d.get("region_with_type"))
+            if p and p != title
+        ) or "Россия"
+        out.append(
+            GeocodeResult(
+                id=str(d.get("fias_id") or d.get("kladr_id") or value),
+                title=title or value,
+                subtitle=subtitle,
+                coords=[float(lon), float(lat)],
+            )
+        )
+    return out
 
 
 async def search_address(q: str, limit: int = 6) -> List[GeocodeResult]:
@@ -23,9 +73,15 @@ async def search_address(q: str, limit: int = 6) -> List[GeocodeResult]:
         return []
 
     limit = max(1, min(limit, 10))
+    # 1) DaData — лучшие подсказки по РФ (улица → дом)
+    results = await _dadata(q, limit)
+    if results is not None:
+        return results
+    # 2) MapTiler, если задан ключ
     results = await _maptiler(q, limit)
     if results is not None:
         return results
+    # 3) запасной — Nominatim (OSM)
     return await _nominatim(q, limit)
 
 
