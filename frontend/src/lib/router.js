@@ -7,43 +7,27 @@
 //
 // Координаты везде [долгота, широта] — родной формат и ORS, и MapLibre.
 
-const API_KEY = import.meta.env.VITE_ORS_API_KEY;
-const ENDPOINT = 'https://api.openrouteservice.org/v2/directions/foot-walking/geojson';
-
-export const hasRouterKey = Boolean(API_KEY);
+// Геометрию пешего маршрута теперь отдаёт бэкенд (POST /api/route) — ключ ORS
+// живёт на сервере, а не в бандле.
 
 // Возвращает { line, legs } либо null, если маршрут построить не удалось.
 //   line — [[долгота, широта], …] для слоя линии на карте;
 //   legs — по участку на пару соседних точек: { duration (мин), length (м) }.
 export async function fetchRouteDetails(points) {
-  if (!hasRouterKey || points.length < 2) return null;
+  if (points.length < 2) return null;
 
   try {
-    const response = await fetch(ENDPOINT, {
+    const response = await fetch('/api/route', {
       method: 'POST',
-      headers: {
-        Authorization: API_KEY,
-        'Content-Type': 'application/json',
-        Accept: 'application/geo+json',
-      },
-      body: JSON.stringify({ coordinates: points }),
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ points }),
     });
-
-    if (!response.ok) {
-      throw new Error(`OpenRouteService ответил ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`API ответил ${response.status}`);
 
     const data = await response.json();
-    const feature = data?.features?.[0];
-    const line = feature?.geometry?.coordinates;
+    const line = data?.line;
     if (!Array.isArray(line) || line.length < 2) return null;
-
-    const legs = (feature.properties?.segments ?? []).map((segment) => ({
-      duration: Math.round((segment.duration ?? 0) / 60),
-      length: Math.round(segment.distance ?? 0),
-    }));
-
-    return { line, legs };
+    return { line, legs: data.legs ?? [] };
   } catch (error) {
     console.warn('[Рядом] Маршрут не построен, рисуем прямую линию —', error.message);
     return null;

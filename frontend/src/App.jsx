@@ -14,9 +14,9 @@ import NoFitScreen from './screens/NoFitScreen.jsx';
 import EditSheet from './screens/EditSheet.jsx';
 import HistoryScreen from './screens/HistoryScreen.jsx';
 
-import { CITY, HISTORY, PLACES, TIME_OPTIONS } from './data/places.js';
-import { BUFFER, buildChain, pickPlaces } from './lib/planner.js';
-import { walkMinutes } from './lib/geo.js';
+import { CITY, HISTORY } from './data/places.js';
+import { rankPlaces } from './lib/planner.js';
+import { searchRemote } from './lib/api.js';
 import { detectColorScheme, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
 import { formatDate } from './lib/format.js';
 
@@ -33,6 +33,7 @@ export default function App() {
   const [interests, setInterests] = useState(DEFAULT_INTERESTS);
   const [results, setResults] = useState([]);
   const [chain, setChain] = useState(null);
+  const [searchReady, setSearchReady] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(CITY.start);
   const [mode, setMode] = useState('single');
@@ -72,27 +73,40 @@ export default function App() {
     document.documentElement.dataset.theme = scheme;
   }, [scheme]);
 
-  // Предварительный подбор под текущие параметры — нужен шторке «Изменить подбор»,
-  // чтобы кнопка сразу показывала, сколько мест получится.
-  const preview = useMemo(() => pickPlaces(minutes, interests, start), [minutes, interests, start]);
+  // Предпросмотр для шторки «Изменить подбор»: пересчитываем уже загруженные
+  // с бэка места под новое время/интересы — без нового запроса.
+  const preview = useMemo(
+    () => rankPlaces(results, minutes, interests, start),
+    [results, minutes, interests, start],
+  );
 
   const runSearch = useCallback(
     (nextMinutes = minutes, nextInterests = interests) => {
       setMinutes(nextMinutes);
       setInterests(nextInterests);
       setStartAt(new Date());
-      const found = pickPlaces(nextMinutes, nextInterests, start);
-      setResults(found);
-      setChain(buildChain(nextMinutes, nextInterests, start));
-      setSelectedId(found.find((p) => p.eval.status !== 'no')?.id ?? found[0]?.id ?? null);
       setMode('single');
       setSheet(null);
+      setSearchReady(false);
       // Повторный подбор подменяет текущий экран, первый — добавляется поверх.
       setStack((s) => {
         const top = s[s.length - 1];
         directionRef.current = 'push';
         return ['loading', 'results', 'nofit'].includes(top) ? [...s.slice(0, -1), 'loading'] : [...s, 'loading'];
       });
+
+      searchRemote(nextMinutes, nextInterests, start)
+        .then(({ places, chain: nextChain }) => {
+          setResults(places);
+          setChain(nextChain);
+          setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
+        })
+        .catch(() => {
+          setResults([]);
+          setChain(null);
+          setSelectedId(null);
+        })
+        .finally(() => setSearchReady(true));
     },
     [minutes, interests, start],
   );
@@ -136,29 +150,36 @@ export default function App() {
     [go, saveTrip],
   );
 
-  // Повтор поездки восстанавливает её собственные условия: берём бюджет,
-  // в который место реально укладывается, иначе маршрут покажет «запас 0».
+  // Повтор поездки из истории: заново ищем места на бэке под её время и
+  // интересы и открываем результаты (путь назад ведёт к карте, а не в тупик).
   const repeatTrip = useCallback(
     (trip) => {
-      const place = PLACES.find((p) => p.id === trip.placeId);
-      if (!place) return;
-
-      const walk = walkMinutes(start, place.coords);
-      const needed = walk * 2 + place.idealVisit + BUFFER;
-      const option = TIME_OPTIONS.find((o) => o.minutes >= needed);
-      const nextMinutes = option ? option.minutes : Math.ceil(needed / 15) * 15;
+      const nextMinutes = Math.min(240, Math.max(15, trip.minutes || minutes));
       const nextInterests = trip.interests?.length ? trip.interests : interests;
 
       setMinutes(nextMinutes);
       setInterests(nextInterests);
       setStartAt(new Date());
-      setResults(pickPlaces(nextMinutes, nextInterests, start));
-      setChain(buildChain(nextMinutes, nextInterests, start));
-      setSelectedId(place.id);
-      // Из истории путь назад должен вести к карте, а не в тупик.
-      replace('location', 'results', 'route');
+      setMode('single');
+      setSheet(null);
+      setSearchReady(false);
+      directionRef.current = 'push';
+      replace('location', 'results', 'loading');
+
+      searchRemote(nextMinutes, nextInterests, start)
+        .then(({ places, chain: nextChain }) => {
+          setResults(places);
+          setChain(nextChain);
+          setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
+        })
+        .catch(() => {
+          setResults([]);
+          setChain(null);
+          setSelectedId(null);
+        })
+        .finally(() => setSearchReady(true));
     },
-    [interests, start, replace],
+    [interests, start, minutes, replace],
   );
 
   const fitsCount = results.filter((p) => p.eval.status !== 'no').length;
@@ -200,6 +221,7 @@ export default function App() {
             interests={interests}
             found={results.length}
             fits={fitsCount}
+            ready={searchReady}
             onDone={() => swap(fitsCount ? 'results' : 'nofit')}
           />
         );
@@ -259,7 +281,7 @@ export default function App() {
             minutes={minutes}
             interests={interests}
             nearest={nearest}
-            suggestion={pickPlaces(minutes + 30, interests).filter((p) => p.eval.status !== 'no').length}
+            suggestion={rankPlaces(results, minutes + 30, interests, start).filter((p) => p.eval.status !== 'no').length}
             onAddTime={() => runSearch(minutes + 30, interests)}
             onEditInterests={back}
             onShowAnyway={() => swap('results')}

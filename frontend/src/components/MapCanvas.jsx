@@ -3,10 +3,12 @@
 // порядок MapLibre, разворачивать ничего не надо.
 
 import { useEffect, useRef, useState } from 'react';
-// maplibre-gl 6 отдаёт только именованные экспорты; Map переименован,
-// чтобы не перекрывать глобальный Map.
-import { Map as MapLibreMap, Marker, LngLatBounds } from 'maplibre-gl';
+// Классы берём из default-экспорта — так работает и в v4, и в v6 maplibre-gl
+// (именованные экспорты в разных версиях отличаются).
+import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+
+const { Map: MapLibreMap, Marker, LngLatBounds } = maplibregl;
 
 import { CenterPin, pinElement, userElement } from './MapPin.jsx';
 import { hasVectorStyle, mapStyle } from '../lib/mapStyle.js';

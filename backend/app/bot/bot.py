@@ -37,3 +37,7 @@ class BotApp:
 
     def run(self):
         self.bot.run()
+
+    async def start(self):
+        # поллинг в общем event loop (для запуска рядом с API)
+        await self.bot.start_polling()

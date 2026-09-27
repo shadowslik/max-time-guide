@@ -6,7 +6,7 @@ import math
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from backend.app.data.places import PLACES
+from backend.app.data.sources import fetch_places
 from backend.app.models.schemas import (
     ChainLeg,
     ChainOut,
@@ -61,7 +61,10 @@ def search_places(req: SearchRequest) -> SearchResponse:
 
     evaluated: List[PlaceOut] = []
 
-    for p in PLACES:
+    # реальные данные: места (OSM) + мероприятия (KudaGo)
+    catalog = fetch_places(start, req.interests)
+
+    for p in catalog:
         if not _filter_interests(p, req.interests):
             continue
 

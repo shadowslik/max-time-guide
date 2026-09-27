@@ -7,7 +7,7 @@ import { formatBudget, interestsLabel } from '../lib/format.js';
 
 const STEP_MS = 480;
 
-export default function LoadingScreen({ theme, minutes, interests, found, fits, onDone }) {
+export default function LoadingScreen({ theme, minutes, interests, found, fits, onDone, ready = true }) {
   const [step, setStep] = useState(0);
 
   const steps = [
@@ -20,12 +20,14 @@ export default function LoadingScreen({ theme, minutes, interests, found, fits, 
 
   useEffect(() => {
     if (step >= steps.length) {
+      // Анимация закончилась — уходим дальше только когда бэк уже ответил.
+      if (!ready) return undefined;
       const done = setTimeout(onDone, STEP_MS);
       return () => clearTimeout(done);
     }
     const timer = setTimeout(() => setStep((s) => s + 1), STEP_MS);
     return () => clearTimeout(timer);
-  }, [step, steps.length, onDone]);
+  }, [step, steps.length, onDone, ready]);
 
   const accent = theme === 'dark' ? 'var(--accent-text)' : 'var(--accent)';
   const progress = Math.round(((step + 1) / (steps.length + 1)) * 100);

@@ -49,18 +49,23 @@ export function evaluatePlace(place, minutes) {
   };
 }
 
-// Отбор и сортировка мест под интересы и время.
-export function pickPlaces(minutes, interestIds, from) {
-  // Пустой список интересов означает «покажи что угодно».
-  const matched = PLACES.filter(
-    (p) => interestIds.length === 0 || p.interests.some((i) => interestIds.includes(i)),
-  )
+// Отбор и сортировка ЗАДАННОГО списка мест под интересы и время.
+// Используется для локального предпросмотра по уже загруженным с бэка местам
+// (пересчитать «сколько влезет» при другом времени — без нового запроса).
+export function rankPlaces(places, minutes, interestIds, from) {
+  const matched = places
+    .filter((p) => interestIds.length === 0 || (p.interests ?? []).some((i) => interestIds.includes(i)))
     .map((p) => withTravel(p, from))
     .map((p) => ({ ...p, eval: evaluatePlace(p, minutes) }));
 
   const rank = { fits: 0, tight: 1, no: 2 };
   matched.sort((a, b) => rank[a.eval.status] - rank[b.eval.status] || a.eval.road - b.eval.road);
   return matched;
+}
+
+// Отбор по встроенному тестовому каталогу (fallback, если бэк недоступен).
+export function pickPlaces(minutes, interestIds, from) {
+  return rankPlaces(PLACES, minutes, interestIds, from);
 }
 
 // Цепочка из двух мест: перебираем пары и берём ту, где суммарно больше

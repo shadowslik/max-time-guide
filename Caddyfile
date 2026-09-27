@@ -3,11 +3,13 @@
 168.113.157.47.sslip.io {
     encode gzip
 
-    # Бэкенд появится позже. Когда добавишь сервис `api`, раскомментируй:
-    # handle_path /api/* {
-    #     reverse_proxy api:8000
-    # }
+    # Бэкенд-API: путь /api/* уходит на сервис backend (FastAPI на 8000).
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
 
-    # Мини-приложение (React через nginx)
-    reverse_proxy frontend:80
+    # Всё остальное — мини-приложение (React через nginx).
+    handle {
+        reverse_proxy frontend:80
+    }
 }
