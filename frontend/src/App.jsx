@@ -36,6 +36,8 @@ export default function App() {
   const [searchReady, setSearchReady] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(CITY.start);
+  // Подпись выбранного адреса (улица/дом) — чтобы на карте показывать её, а не город.
+  const [startLabel, setStartLabel] = useState(null);
   const [mode, setMode] = useState('single');
   const [startAt, setStartAt] = useState(() => new Date());
   const [history, setHistory] = useState(HISTORY);
@@ -292,8 +294,9 @@ export default function App() {
       case 'address':
         return (
           <AddressScreen
-            onPick={(coords) => {
-              setStart(coords);
+            onPick={(item) => {
+              setStart(item.coords);
+              setStartLabel({ title: item.title, subtitle: item.subtitle });
               back();
             }}
             onBack={back}
@@ -316,8 +319,11 @@ export default function App() {
           <LocationScreen
             theme={scheme}
             start={start}
+            label={startLabel}
             onConfirm={(coords) => {
               setStart(coords);
+              // Точку взяли с карты, а не из поиска — подпись адреса больше не актуальна.
+              if (coords !== start) setStartLabel(null);
               go('time');
             }}
             onAddress={() => go('address')}

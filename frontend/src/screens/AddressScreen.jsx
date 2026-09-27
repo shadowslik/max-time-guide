@@ -78,7 +78,7 @@ export default function AddressScreen({ onPick, onBack }) {
             {results.map((item, index) => (
               <div key={item.id ?? index}>
                 {index > 0 && <div className="list__sep" />}
-                <button type="button" className="list__row" onClick={() => onPick(item.coords)}>
+                <button type="button" className="list__row" onClick={() => onPick(item)}>
                   <span className="list__icon">
                     <Icon name="pin" size={19} />
                   </span>

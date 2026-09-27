@@ -9,7 +9,7 @@ import { hasGeocoder } from '../lib/geocoder.js';
 // Без кнопки «Ввести адрес» шторке не нужна её высота.
 const SHEET = hasGeocoder ? 392 : 328;
 
-export default function LocationScreen({ theme, start, onConfirm, onAddress, onHistory }) {
+export default function LocationScreen({ theme, start, label, onConfirm, onAddress, onHistory }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
 
   // Адрес выбирают на отдельном экране — возвращаясь, переносим карту туда.
@@ -17,12 +17,22 @@ export default function LocationScreen({ theme, start, onConfirm, onAddress, onH
     if (start) setCoords(start);
   }, [start]);
 
+  // Пока метка стоит ровно на выбранном адресе — показываем его улицу, а не
+  // город. Стоит подвинуть карту — точка уже не та, возвращаем название города.
+  const onPicked =
+    label && start &&
+    Math.abs(coords[0] - start[0]) < 1e-4 &&
+    Math.abs(coords[1] - start[1]) < 1e-4;
+  const place = onPicked ? label.title : CITY.name;
+  // Выбранный адрес показываем крупно (метка на доме), свободный поиск — обзорно.
+  const zoom = label ? 17 : 15;
+
   return (
     <div className="screen screen--map">
       <MapCanvas
         theme={theme}
         center={coords}
-        zoom={15}
+        zoom={zoom}
         bottomInset={SHEET}
         centerPin
         recenterKey={start?.join()}
@@ -58,7 +68,7 @@ export default function LocationScreen({ theme, start, onConfirm, onAddress, onH
                 Где ты сейчас?
               </h1>
               <p style={{ margin: '3px 0 0', fontSize: 13.5, color: 'var(--text-2)' }}>
-                {CITY.name}
+                {place}
               </p>
             </div>
           </div>
