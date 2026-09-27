@@ -40,6 +40,7 @@ async def _dadata(q: str, limit: int):
         return None
 
     out: List[GeocodeResult] = []
+    seen = set()
     for s in data.get("suggestions", []):
         d = s.get("data") or {}
         lat, lon = d.get("geo_lat"), d.get("geo_lon")
@@ -56,6 +57,14 @@ async def _dadata(q: str, limit: int):
             p for p in (d.get("city_with_type"), d.get("region_with_type"))
             if p and p != title
         ) or "Россия"
+
+        # Схлопываем одинаковые по отображению адреса (корпуса/строения/квартиры
+        # одного дома DaData отдаёт отдельно, а показываем мы одинаково).
+        key = (title or value, subtitle)
+        if key in seen:
+            continue
+        seen.add(key)
+
         out.append(
             GeocodeResult(
                 id=str(d.get("fias_id") or d.get("kladr_id") or value),
