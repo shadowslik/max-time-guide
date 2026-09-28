@@ -7,7 +7,7 @@ import { formatBudget, interestsLabel } from '../lib/format.js';
 
 const STEP_MS = 480;
 
-export default function LoadingScreen({ theme, minutes, interests, found, fits, onDone, ready = true }) {
+export default function LoadingScreen({ theme, origin, minutes, interests, found, fits, onDone, ready = true }) {
   const [step, setStep] = useState(0);
 
   const steps = [
@@ -42,7 +42,7 @@ export default function LoadingScreen({ theme, minutes, interests, found, fits, 
 
         <h1 className="title-l mt-26" style={{ fontSize: 26 }}>Подбираем места…</h1>
         <p style={{ margin: '8px 0 0', fontSize: 14.5, color: 'var(--text-2)', textAlign: 'center' }}>
-          {CITY.name}, {CITY.district} · {formatBudget(minutes)}
+          {origin || CITY.name} · {formatBudget(minutes)}
           <br />
           {interestsLabel(interests, INTERESTS)}
         </p>

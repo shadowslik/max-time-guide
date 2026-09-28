@@ -98,6 +98,12 @@
   filter: invert(0.92) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.7);
 }
 
+/* Тёмный стиль OpenFreeMap почти чёрный — чуть приподнимаем яркость, чтобы
+   улицы и подписи читались. Метки/плашки — отдельные элементы, их не трогает. */
+[data-theme='dark'] .map .maplibregl-canvas {
+  filter: brightness(1.45) contrast(0.92);
+}
+
 /* ── Плашка параметров и легенда ───────────────────────────── */
 
 .params {

@@ -219,6 +219,7 @@ export default function App() {
         return (
           <LoadingScreen
             theme={scheme}
+            origin={startLabel?.title || `${CITY.name}, ${CITY.district}`}
             minutes={minutes}
             interests={interests}
             found={results.length}
@@ -233,6 +234,7 @@ export default function App() {
           <ResultsScreen
             theme={scheme}
             start={start}
+            origin={startLabel?.title || `${CITY.name}, ${CITY.district}`}
             minutes={minutes}
             interests={interests}
             results={results}

@@ -131,7 +131,7 @@ function ChainPanel({ chain, minutes, startAt, onOpen }) {
 }
 
 export default function ResultsScreen({
-  theme, start, minutes, interests, results, selected, chain, mode, startAt,
+  theme, start, origin, minutes, interests, results, selected, chain, mode, startAt,
   onSelect, onOpenPlace, onRoute, onEdit, onBack, onMode,
 }) {
   const chainMode = mode === 'chain' && Boolean(chain);
@@ -212,7 +212,7 @@ export default function ResultsScreen({
               {formatBudget(minutes)} · {interestsLabel(interests, INTERESTS)}
             </div>
             <div className="params__sub">
-              {CITY.name}, {CITY.district} · до {clock(addMinutes(startAt, minutes))}
+              {origin || CITY.name} · до {clock(addMinutes(startAt, minutes))}
             </div>
           </div>
           <button type="button" className="params__edit" aria-label="Изменить время и интересы" onClick={onEdit}>
