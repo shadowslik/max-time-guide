@@ -16,6 +16,7 @@ from typing import List, Optional
 
 import httpx
 
+from backend.app.config import CULTURE_API_KEY, TWOGIS_KEY
 from backend.app.data.places import PLACES  # запасной каталог — только рядом с Казанью
 
 log = logging.getLogger(__name__)
@@ -49,11 +50,20 @@ OVERPASS_URLS = [
 ]
 OVERPASS_TRIES = 2  # инфраструктура Overpass перегружена — пробуем список дважды
 KUDAGO_URL = "https://kudago.com/public-api/v1.4/events/"
-# Культура.РФ / ЕИПСК — события по всей России (в т.ч. там, где нет KudaGo).
-CULTURE_URLS = [
-    "https://all.culture.ru/api/2.2/events",
-    "https://all.culture.ru/api/2.1/events",
-]
+TWOGIS_URL = "https://catalog.api.2gis.com/3.0/items"
+# Культура.РФ / PRO — события по всей России. Публичный доступ закрыт, нужен ключ.
+CULTURE_URL = "https://pro.culture.ru/api/2.2/events"
+
+# интерес → поисковые запросы 2ГИС (рубрики). Один запрос на фразу.
+TWOGIS_QUERIES = {
+    "history": ["достопримечательность", "памятник"],
+    "art": ["музей", "галерея"],
+    "arch": ["храм", "собор"],
+    "walk": ["парк", "сквер"],
+    "food": ["кафе", "ресторан"],
+    "photo": ["смотровая площадка", "достопримечательность"],
+    "culture": ["театр", "музей"],
+}
 HEADERS = {"User-Agent": "max-time-guide/1.0 (hackathon)"}  # Overpass без него даёт 406
 TIMEOUT = 50.0  # больше серверного [timeout:40], иначе рвём соединение раньше ответа
 
@@ -220,6 +230,92 @@ def fetch_osm_places(start, interests, minutes=120, limit=80) -> List[dict]:
     return places
 
 
+def _visit_time_by_interests(ints) -> tuple:
+    s = set(ints)
+    if "food" in s:
+        return 60, 40
+    if {"art", "culture"} & s:
+        return 60, 30
+    if "walk" in s:
+        return 40, 20
+    if "photo" in s:
+        return 20, 10
+    return 30, 15
+
+
+def fetch_2gis_places(start, interests, minutes=120, per_query=12, limit=80) -> Optional[List[dict]]:
+    """Места из 2ГИС по категориям и радиусу (основной источник). None — ключ не задан."""
+    if not TWOGIS_KEY:
+        return None
+
+    ids = [i for i in (interests or []) if i in TWOGIS_QUERIES] or list(TWOGIS_QUERIES)
+    # Запрос → интересы, которые его породили (музей относится к art и culture).
+    qmap: dict = {}
+    for i in ids:
+        for q in TWOGIS_QUERIES[i]:
+            qmap.setdefault(q, set()).add(i)
+
+    radius_m = _reachable_radius_m(minutes)
+    lon, lat = start
+    point = f"{lon},{lat}"
+    out: List[dict] = []
+    by_id: dict = {}
+
+    with httpx.Client(timeout=15.0, headers=HEADERS) as client:
+        for q, q_ints in qmap.items():
+            params = {
+                "q": q, "point": point, "radius": radius_m,
+                "sort": "distance", "sort_point": point,
+                "page_size": per_query, "type": "branch",
+                "fields": "items.point,items.address_name,items.full_name,items.rubrics",
+                "key": TWOGIS_KEY,
+            }
+            try:
+                r = client.get(TWOGIS_URL, params=params)
+                if r.status_code != 200:
+                    log.warning("2gis %s → %s", q, r.status_code)
+                    continue
+                items = ((r.json() or {}).get("result") or {}).get("items") or []
+            except Exception as e:  # noqa: BLE001
+                log.warning("2gis %s fail: %s", q, e)
+                continue
+
+            for it in items:
+                pt = it.get("point") or {}
+                plat, plon = pt.get("lat"), pt.get("lon")
+                name = (it.get("name") or "").strip()
+                if plat is None or plon is None or not name:
+                    continue
+                oid = str(it.get("id") or f"{name}:{plon}:{plat}")
+                if oid in by_id:  # уже нашли по другому запросу — доклеиваем интересы
+                    rec = by_id[oid]
+                    rec["interests"] = list(dict.fromkeys(rec["interests"] + list(q_ints)))
+                    continue
+                ideal, mn = _visit_time_by_interests(q_ints)
+                rubric = next((rb.get("name") for rb in (it.get("rubrics") or []) if rb.get("name")), "")
+                rec = {
+                    "id": f"2gis/{oid}",
+                    "name": name,
+                    "short": name,
+                    "interests": list(q_ints),
+                    "price": "уточняйте",
+                    "priceNote": "",
+                    "hours": "",
+                    "blurb": it.get("full_name") or it.get("address_name") or "",
+                    "highlights": [rubric] if rubric else [],
+                    "coords": [float(plon), float(plat)],
+                    "idealVisit": ideal,
+                    "minVisit": mn,
+                }
+                by_id[oid] = rec
+                out.append(rec)
+                if len(out) >= limit:
+                    log.info("2gis: %s мест", len(out))
+                    return out
+    log.info("2gis: %s мест", len(out))
+    return out
+
+
 def _kudago_city(start) -> Optional[str]:
     """Ближайший город KudaGo, если он в разумной близости (иначе событий нет)."""
     best, best_d = None, float("inf")
@@ -307,11 +403,14 @@ def _culture_interests(category: str, tags) -> List[str]:
 
 
 def fetch_culture_events(start, minutes=120, limit=40) -> List[dict]:
-    """События Культуры.РФ (ЕИПСК) рядом. Открыто по всей РФ, есть «Пушкинская карта».
+    """События Культуры.РФ (PRO) рядом. По всей РФ, есть «Пушкинская карта».
 
-    Схема ответа на разных версиях чуть отличается — берём поля максимально
+    Требует ключ CULTURE_API_KEY (публичный доступ закрыт). Схема полей берётся
     терпимо, любой сбой → пустой список (источник необязательный).
     """
+    if not CULTURE_API_KEY:
+        return []  # без ключа PRO.Культура.РФ отдаёт 403 — не ходим зря
+
     radius_m = _reachable_radius_m(minutes)
     lon, lat = start
     now_ms = int(time.time() * 1000)
@@ -319,18 +418,18 @@ def fetch_culture_events(start, minutes=120, limit=40) -> List[dict]:
         "longitude": lon, "latitude": lat, "distance": radius_m,
         "start": now_ms, "limit": limit, "sort": "start", "order": "asc",
     }
+    # Ключ шлём и заголовком, и параметром — точную схему подтвердим по логам.
+    headers = {**HEADERS, "X-API-KEY": CULTURE_API_KEY}
     data = None
-    for url in CULTURE_URLS:
-        try:
-            with httpx.Client(timeout=20.0, headers=HEADERS, follow_redirects=True) as client:
-                r = client.get(url, params=params)
-                if r.status_code != 200:
-                    log.warning("culture %s → %s (итог %s)", url, r.status_code, r.url)
-                    continue
+    try:
+        with httpx.Client(timeout=20.0, headers=headers, follow_redirects=True) as client:
+            r = client.get(CULTURE_URL, params={**params, "apikey": CULTURE_API_KEY})
+            if r.status_code != 200:
+                log.warning("culture → %s (итог %s)", r.status_code, r.url)
+            else:
                 data = r.json()
-                break
-        except Exception as e:  # noqa: BLE001
-            log.warning("culture %s fail: %s", url, e)
+    except Exception as e:  # noqa: BLE001
+        log.warning("culture fail: %s", e)
     if not data:
         return []
 
@@ -380,10 +479,11 @@ def fetch_culture_events(start, minutes=120, limit=40) -> List[dict]:
 
 
 def fetch_places(start, interests, minutes=120) -> List[dict]:
-    """Места (OSM) + события (Культура.РФ, KudaGo) в радиусе, доступном за время.
+    """Места (2ГИС → OSM) + события (Культура.РФ, KudaGo) в доступном за время радиусе.
 
-    Радиус растёт со временем. При сбое OSM запасной каталог берём только рядом с
-    Казанью — в других городах лучше показать пусто, чем чужие места.
+    Основной источник мест — 2ГИС (быстрый, по всей РФ). Если ключа нет или он
+    ничего не вернул — откатываемся на OSM. При сбое OSM запасной каталог берём
+    только рядом с Казанью, иначе лучше пусто, чем чужие места.
     """
     # Ключ кэша: место (~100 м), корзина времени (радиус) и набор интересов.
     key = (
@@ -395,11 +495,17 @@ def fetch_places(start, interests, minutes=120) -> List[dict]:
     if cached is not None:
         return cached
 
+    places = None
     try:
-        places = fetch_osm_places(start, interests, minutes)
-    except Exception as e:
-        log.warning("overpass упал: %s", e)
-        places = list(PLACES) if _haversine_m(start, KAZAN) < 30000 else []
+        places = fetch_2gis_places(start, interests, minutes)  # None, если ключа нет
+    except Exception as e:  # noqa: BLE001
+        log.warning("2gis упал: %s", e)
+    if not places:  # ключа нет или пусто — берём OSM
+        try:
+            places = fetch_osm_places(start, interests, minutes)
+        except Exception as e:
+            log.warning("overpass упал: %s", e)
+            places = list(PLACES) if _haversine_m(start, KAZAN) < 30000 else []
 
     # События: Культура.РФ (вся РФ) + KudaGo (где есть). Дедуп по (имя, ~координаты).
     events = fetch_culture_events(start, minutes) + fetch_kudago_events(start, minutes)
