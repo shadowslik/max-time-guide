@@ -292,7 +292,7 @@ export default function ResultsScreen({
               <div className="section-label mt-16" style={{ marginBottom: 8 }}>
                 На всё сразу времени мало — выбери вариант
               </div>
-              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2, touchAction: 'pan-x', WebkitOverflowScrolling: 'touch' }}>
                 {variants.map((v, i) => {
                   const active = i === Math.min(variantIdx, variants.length - 1);
                   return (

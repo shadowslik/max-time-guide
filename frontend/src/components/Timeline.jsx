@@ -6,9 +6,11 @@ import MapPin from './MapPin.jsx';
 function Mark({ item }) {
   if (item.type === 'start') return <span className="timeline__mark" />;
   if (item.type === 'finish') {
+    // Дом. Зелёный — успеваешь, оранжевый — не успеваешь.
+    const bg = item.tone === 'warn' ? 'var(--warn-text)' : 'var(--ok-text)';
     return (
-      <span className="timeline__mark timeline__mark--finish">
-        <Icon name="check" size={10} />
+      <span className="timeline__mark timeline__mark--finish" style={{ background: bg }}>
+        <Icon name="home" size={14} />
       </span>
     );
   }

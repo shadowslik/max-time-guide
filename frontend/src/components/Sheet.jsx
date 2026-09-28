@@ -150,7 +150,9 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
     >
       <div className={`sheet ${className}`.trim()} style={{ height: max }}>
         <span className="grabber" />
-        {children}
+        {/* Тело прокручивается само (data-no-drag — чтобы жест внутри скроллил
+            контент, а не тянул шторку). Ручка сверху по-прежнему тянет шторку. */}
+        <div className="sheet__body" data-no-drag>{children}</div>
       </div>
     </div>
   );
