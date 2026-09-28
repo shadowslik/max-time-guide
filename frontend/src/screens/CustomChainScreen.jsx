@@ -51,7 +51,7 @@ export default function CustomChainScreen({ theme, start, minutes, startAt, chai
     timeline.push({ type: 'leg', text: `${walkBack} мин пешком обратно` });
     timeline.push({
       type: 'finish',
-      title: `Дома в ${clock(addMinutes(startAt, total))}`,
+      title: `На месте в ${clock(addMinutes(startAt, total))}`,
       sub: fits ? `успеваешь, запас ${minutes - total} мин` : `не успеваешь на ${over} мин`,
       tone: fits ? 'ok' : 'warn',
     });

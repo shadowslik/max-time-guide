@@ -1,7 +1,7 @@
-// Экран результатов. «Одно место» и «Цепочка» — это не разные экраны,
-// а два режима одного: карта остаётся на месте, меняется только содержимое
-// шторки и набор меток. Поэтому переключение вкладки не толкает экран,
-// а плавно подменяет панель.
+// Экран результатов. Три режима одной шторки: «Одно место», «Цепочка» и
+// «Мой маршрут». Карта остаётся на месте, меняется содержимое шторки и метки.
+// «Цепочка» и «Мой маршрут» — редактируемые маршруты (можно убирать места),
+// считаются на клиенте одним и тем же способом (RoutePlan).
 
 import { useEffect, useState } from 'react';
 
@@ -9,8 +9,8 @@ import Icon from '../components/Icon.jsx';
 import MapCanvas from '../components/MapCanvas.jsx';
 import MapPin, { toneForStatus } from '../components/MapPin.jsx';
 import TimeBudgetBar from '../components/TimeBudgetBar.jsx';
-import Timeline from '../components/Timeline.jsx';
 import { Badge, Button, Segmented, Sheet } from '../components/ui.jsx';
+import { computeRoutePlan, RoutePlanPanel } from '../components/RoutePlan.jsx';
 import { CITY, INTERESTS } from '../data/places.js';
 import { addMinutes, clock, formatBudget, interestsLabel, plural } from '../lib/format.js';
 import { externalRouteUrl, fetchRouteDetails } from '../lib/router.js';
@@ -19,7 +19,7 @@ import { openExternal } from '../lib/maxBridge.js';
 const badgeTone = (status) => (status === 'fits' ? 'ok' : status === 'tight' ? 'warn' : 'muted');
 const statusLabel = (status) => (status === 'fits' ? 'Успеваешь' : status === 'tight' ? 'Впритык' : 'Не успеешь');
 
-function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute, inChain, onToggleChain }) {
+function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute, inRoute, onToggle }) {
   if (!selected) {
     return <p className="lead">Под это время ничего не нашлось. Попробуй изменить подбор.</p>;
   }
@@ -58,11 +58,11 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
         <button
           type="button"
           className="icon-button"
-          style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, color: inChain?.(selected.id) ? 'var(--accent-text)' : 'var(--text-2)' }}
-          aria-label={inChain?.(selected.id) ? 'Убрать из моего маршрута' : 'В мой маршрут'}
-          onClick={() => onToggleChain?.(selected)}
+          style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, color: inRoute?.(selected.id) ? 'var(--accent-text)' : 'var(--text-2)' }}
+          aria-label={inRoute?.(selected.id) ? 'Убрать из моего маршрута' : 'В мой маршрут'}
+          onClick={() => onToggle?.(selected)}
         >
-          <Icon name={inChain?.(selected.id) ? 'check' : 'plus'} size={22} />
+          <Icon name={inRoute?.(selected.id) ? 'check' : 'plus'} size={22} />
         </button>
       </div>
 
@@ -73,20 +73,37 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
             {others.map((place, index) => (
               <div key={place.id}>
                 {index > 0 && <div className="list__sep" />}
-                <button type="button" className="list__row" onClick={() => onSelect(place.id)} aria-label={`Показать: ${place.name}`}>
-                  <span className="list__icon" style={{ background: 'transparent' }}>
+                <div className="list__row" style={{ cursor: 'default' }}>
+                  <button
+                    type="button"
+                    className="list__icon"
+                    style={{ background: 'transparent', border: 0, padding: 0, cursor: 'pointer' }}
+                    aria-label={`Показать: ${place.name}`}
+                    onClick={() => onSelect(place.id)}
+                  >
                     <MapPin tone={toneForStatus(place.eval.status)} size={22} />
-                  </span>
-                  <span className="list__body">
+                  </button>
+                  <button
+                    type="button"
+                    className="list__body"
+                    style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', color: 'inherit', cursor: 'pointer' }}
+                    onClick={() => onSelect(place.id)}
+                  >
                     <span className="list__title" style={{ display: 'block' }}>{place.name}</span>
                     <span className="list__sub" style={{ display: 'block' }}>
                       {place.walkTo} мин пешком · ~{place.eval.visit} мин на месте
                     </span>
-                  </span>
-                  <Badge tone={badgeTone(place.eval.status)}>
-                    {place.eval.status === 'fits' ? 'успеешь' : place.eval.status === 'tight' ? 'впритык' : 'нет'}
-                  </Badge>
-                </button>
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    style={{ width: 36, height: 36, flexShrink: 0, color: inRoute?.(place.id) ? 'var(--accent-text)' : 'var(--text-2)' }}
+                    aria-label={inRoute?.(place.id) ? 'Убрать из маршрута' : 'В маршрут'}
+                    onClick={() => onToggle?.(place)}
+                  >
+                    <Icon name={inRoute?.(place.id) ? 'check' : 'plus'} size={20} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -96,61 +113,29 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
   );
 }
 
-function ChainPanel({ chain, minutes, startAt, onOpen }) {
-  const items = [{ type: 'start', title: 'Выходишь отсюда', sub: clock(startAt) }];
-  let cursor = startAt;
-
-  chain.legs.forEach((leg, index) => {
-    cursor = addMinutes(cursor, leg.walk);
-    const arrive = cursor;
-    cursor = addMinutes(cursor, leg.visit);
-    items.push({ type: 'leg', text: `${leg.walk} мин пешком` });
-    items.push({
-      type: 'stop',
-      number: index + 1,
-      title: leg.place.name,
-      sub: `${clock(arrive)} – ${clock(cursor)} · ~${leg.visit} мин · ${interestsLabel(leg.place.interests.slice(0, 1), INTERESTS)}`,
-    });
-  });
-
-  const home = addMinutes(cursor, chain.walkBack);
-  items.push({ type: 'leg', text: `${chain.walkBack} мин пешком обратно` });
-  items.push({
-    type: 'finish',
-    title: `Ты снова здесь в ${clock(home)}`,
-    sub: `до конца твоего времени ещё ${chain.buffer} минут`,
-    tone: 'ok',
-  });
-
-  return (
-    <>
-      <div className="row mt-16">
-        <h2 className="title-m grow">Успеешь оба за {formatBudget(minutes)}</h2>
-        <Badge tone="ok">запас {chain.buffer} мин</Badge>
-      </div>
-
-      <div className="mt-14">
-        <Timeline items={items} />
-      </div>
-
-      <Button className="mt-16" onClick={onOpen} style={{ height: 52 }}>
-        <Icon name="external" size={19} />
-        Открыть маршрут
-      </Button>
-    </>
-  );
-}
-
 export default function ResultsScreen({
   theme, start, origin, minutes, interests, results, selected, chain, chains = [], mode, startAt,
   onSelect, onOpenPlace, onMarkerOpen, onRoute, onEdit, onBack, onMode,
-  customCount = 0, inChain, onToggleChain, onOpenCustom,
+  myList = [], inMy, onToggleMy, onRemoveMy,
 }) {
-  // Вариантов цепочки может быть несколько (когда времени не хватило на все интересы).
+  // Варианты автоцепочки (когда времени не хватило на все интересы).
   const variants = chains.length ? chains : chain ? [chain] : [];
   const [variantIdx, setVariantIdx] = useState(0);
-  const activeChain = variants[Math.min(variantIdx, variants.length - 1)] ?? null;
-  const chainMode = mode === 'chain' && Boolean(activeChain);
+  const activeVariant = variants[Math.min(variantIdx, variants.length - 1)] ?? null;
+
+  // Редактируемая копия цепочки: сидируется из выбранного варианта, дальше её
+  // можно править (убирать места) независимо.
+  const [chainList, setChainList] = useState([]);
+  const variantKey = activeVariant ? activeVariant.legs.map((l) => l.place.id).join() : '';
+  useEffect(() => {
+    setChainList(activeVariant ? activeVariant.legs.map((l) => l.place) : []);
+  }, [variantKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const routeMode = mode === 'chain' || mode === 'my';
+  const activeList = mode === 'my' ? myList : chainList;
+  const removeFromActive = mode === 'my' ? onRemoveMy : (id) => setChainList((l) => l.filter((p) => p.id !== id));
+
+  const plan = routeMode ? computeRoutePlan(activeList, start, minutes, startAt) : null;
 
   const found = results.length;
   const fits = results.filter((p) => p.eval.status !== 'no').length;
@@ -161,67 +146,56 @@ export default function ResultsScreen({
   };
   const others = results.filter((place) => place.id !== selected?.id);
 
-  // Точки обхода для режима цепочки: старт → места → обратно.
-  const chainPoints = chainMode
-    ? [start, ...activeChain.legs.map((leg) => leg.place.coords), start]
-    : null;
-  const [chainRoute, setChainRoute] = useState(null);
-
+  // Геометрия линии маршрута для активной вкладки-маршрута.
+  const [routeLine, setRouteLine] = useState(null);
+  const routeKey = routeMode ? activeList.map((p) => p.id).join() : '';
   useEffect(() => {
-    if (!chainPoints) {
-      setChainRoute(null);
+    if (!routeMode || activeList.length < 1) {
+      setRouteLine(null);
       return undefined;
     }
-    setChainRoute(chainPoints);
+    const pts = plan.points;
+    setRouteLine(pts);
     let alive = true;
-    fetchRouteDetails(chainPoints).then((details) => {
-      if (alive && details) setChainRoute(details.line);
+    fetchRouteDetails(pts).then((d) => {
+      if (alive && d) setRouteLine(d.line);
     });
-    return () => {
-      alive = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chainMode, activeChain?.legs.map((l) => l.place.id).join()]);
+    return () => { alive = false; };
+  }, [routeMode, routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const markers = chainMode
-    ? activeChain.legs.map((leg, index) => ({
-        id: leg.place.id,
-        coords: leg.place.coords,
-        tone: 'ok',
-        size: 38,
-        number: index + 1,
-        title: leg.place.name,
-        label: leg.place.short,
-      }))
+  const markers = routeMode
+    ? plan.markers
     : results
         // На карте показываем только места с рейтингом от 4★ (без рейтинга —
-        // оставляем, оценить их нельзя; выбранное место видно всегда).
+        // оставляем; выбранное место видно всегда).
         .filter((place) => place.id === selected?.id || place.rating == null || place.rating >= 4)
         .map((place) => {
-        const active = place.id === selected?.id;
-        return {
-          id: place.id,
-          coords: place.coords,
-          title: place.name,
-          tone: toneForStatus(place.eval.status),
-          size: active ? 40 : place.eval.status === 'no' ? 24 : 30,
-          label: active ? `${place.short} · ${place.walkTo} мин` : undefined,
-          labelTone: 'dark',
-        };
-      });
+          const active = place.id === selected?.id;
+          return {
+            id: place.id,
+            coords: place.coords,
+            title: place.name,
+            tone: toneForStatus(place.eval.status),
+            size: active ? 40 : place.eval.status === 'no' ? 24 : 30,
+            label: active ? `${place.short} · ${place.walkTo} мин` : undefined,
+            labelTone: 'dark',
+          };
+        });
+
+  const chainCount = chainList.length || (activeVariant ? activeVariant.legs.length : 0);
 
   return (
     <div className="screen screen--map">
       <MapCanvas
         theme={theme}
-        center={chainMode ? activeChain.legs[0].place.coords : selected?.coords ?? start}
-        zoom={chainMode ? 14 : CITY.zoom}
+        center={routeMode ? (activeList[0]?.coords ?? start) : selected?.coords ?? start}
+        zoom={routeMode ? 14 : CITY.zoom}
         user={{ coords: start }}
         markers={markers}
-        route={chainMode ? chainRoute : undefined}
-        fit={chainMode ? chainPoints : [start, selected?.coords]}
-        bottomInset={chainMode ? 300 : 300}
-        onSelect={chainMode ? undefined : (onMarkerOpen ?? onSelect)}
+        route={routeMode ? routeLine : undefined}
+        fit={routeMode ? (plan.points) : [start, selected?.coords]}
+        bottomInset={300}
+        onSelect={routeMode ? undefined : (onMarkerOpen ?? onSelect)}
       >
         <div className="params drop" style={{ position: 'absolute', left: 16, right: 16, top: 16 }}>
           <button type="button" className="icon-button" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} aria-label="Назад" onClick={onBack}>
@@ -240,54 +214,45 @@ export default function ResultsScreen({
           </button>
         </div>
 
-        <div className="banner drop" style={{ position: 'absolute', left: 16, top: 80, animationDelay: '70ms' }}>
-          <span className="dot" style={{ background: 'var(--ok)' }} />
-          <span>
-            {fits} из {plural(found, 'места', 'мест', 'мест')} успеваешь за {formatBudget(minutes)}
-          </span>
-        </div>
+        {!routeMode && (
+          <>
+            <div className="banner drop" style={{ position: 'absolute', left: 16, top: 80, animationDelay: '70ms' }}>
+              <span className="dot" style={{ background: 'var(--ok)' }} />
+              <span>
+                {fits} из {plural(found, 'места', 'мест', 'мест')} успеваешь за {formatBudget(minutes)}
+              </span>
+            </div>
 
-        {customCount > 0 && (
-          <button
-            type="button"
-            className="banner drop"
-            style={{ position: 'absolute', right: 16, top: 80, animationDelay: '90ms', cursor: 'pointer', color: 'var(--accent-text)', fontWeight: 650 }}
-            onClick={onOpenCustom}
-          >
-            <Icon name="route" size={18} />
-            Мой маршрут · {customCount}
-          </button>
+            <div className="legend drop" style={{ position: 'absolute', left: 16, top: 124, animationDelay: '140ms' }}>
+              {[
+                { key: 'ok', color: 'var(--ok)', label: 'успеешь', value: counts.ok },
+                { key: 'warn', color: 'var(--warn)', label: 'впритык', value: counts.warn },
+                { key: 'muted', color: 'var(--muted-pin)', label: 'не успеешь', value: counts.muted },
+              ]
+                .filter((item) => item.value > 0)
+                .map((item) => (
+                  <span className="legend__item" key={item.key}>
+                    <span className="dot dot--sm" style={{ background: item.color }} />
+                    {item.label} {item.value}
+                  </span>
+                ))}
+            </div>
+          </>
         )}
 
-        {!chainMode && (
-          <div className="legend drop" style={{ position: 'absolute', left: 16, top: 124, animationDelay: '140ms' }}>
-            {[
-              { key: 'ok', color: 'var(--ok)', label: 'успеешь', value: counts.ok },
-              { key: 'warn', color: 'var(--warn)', label: 'впритык', value: counts.warn },
-              { key: 'muted', color: 'var(--muted-pin)', label: 'не успеешь', value: counts.muted },
-            ]
-              .filter((item) => item.value > 0)
-              .map((item) => (
-                <span className="legend__item" key={item.key}>
-                  <span className="dot dot--sm" style={{ background: item.color }} />
-                  {item.label} {item.value}
-                </span>
-              ))}
-          </div>
-        )}
-
-        <Sheet snap={chainMode ? [188, 340, 560] : [188, 340, 620]} initial={340}>
+        <Sheet snap={[188, 360, 620]} initial={360}>
           <Segmented
-            value={chainMode ? 'chain' : 'single'}
+            value={mode}
             onChange={onMode}
             items={[
               { id: 'single', label: 'Одно место' },
-              { id: 'chain', label: activeChain ? `Цепочка · ${activeChain.legs.length} места` : 'Цепочка' },
+              { id: 'chain', label: chainCount ? `Цепочка · ${chainCount}` : 'Цепочка' },
+              { id: 'my', label: myList.length ? `Мой маршрут · ${myList.length}` : 'Мой маршрут' },
             ]}
           />
 
-          {/* Варианты цепочки: когда времени не хватило на все интересы — выбор. */}
-          {chainMode && variants.length > 1 && (
+          {/* Варианты автоцепочки: выбор, когда времени мало на все интересы. */}
+          {mode === 'chain' && variants.length > 1 && (
             <>
               <div className="section-label mt-16" style={{ marginBottom: 8 }}>
                 На всё сразу времени мало — выбери вариант
@@ -316,16 +281,8 @@ export default function ResultsScreen({
             </>
           )}
 
-          {/* key по режиму — панель пересоздаётся и проигрывает появление */}
-          <div className="panel-swap" key={chainMode ? `chain-${variantIdx}` : 'single'}>
-            {chainMode ? (
-              <ChainPanel
-                chain={activeChain}
-                minutes={minutes}
-                startAt={startAt}
-                onOpen={() => openExternal(externalRouteUrl(chainPoints))}
-              />
-            ) : (
+          <div className="panel-swap" key={mode === 'chain' ? `chain-${variantIdx}` : mode}>
+            {mode === 'single' ? (
               <SinglePanel
                 minutes={minutes}
                 selected={selected}
@@ -333,8 +290,21 @@ export default function ResultsScreen({
                 onSelect={onSelect}
                 onOpenPlace={onOpenPlace}
                 onRoute={onRoute}
-                inChain={inChain}
-                onToggleChain={onToggleChain}
+                inRoute={inMy}
+                onToggle={onToggleMy}
+              />
+            ) : (
+              <RoutePlanPanel
+                plan={plan}
+                places={activeList}
+                minutes={minutes}
+                onRemove={removeFromActive}
+                onOpen={() => openExternal(externalRouteUrl(plan.points))}
+                emptyHint={
+                  mode === 'my'
+                    ? `Добавляй места кнопкой «+» на вкладке «Одно место» — посчитаю, успеешь ли обойти их за ${formatBudget(minutes)}.`
+                    : 'Под эти интересы цепочку собрать не вышло. Попробуй изменить подбор или собери свой маршрут.'
+                }
               />
             )}
           </div>

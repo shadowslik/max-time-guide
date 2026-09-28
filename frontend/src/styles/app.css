@@ -8,7 +8,7 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
+  font-family: 'Rubik', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
@@ -171,6 +171,10 @@ button { font: inherit; color: inherit; }
 .sheet__body {
   flex: 1 1 auto;
   min-height: 0;
+  /* flex-колонка, чтобы .spacer по-прежнему прижимал кнопку вниз, когда место
+     есть; при переполнении дети не сжимаются, а тело прокручивается. */
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -178,6 +182,7 @@ button { font: inherit; color: inherit; }
   margin: 0 calc(-1 * var(--gutter));
   padding: 0 var(--gutter);
 }
+.sheet__body > *:not(.spacer) { flex-shrink: 0; }
 
 .grabber {
   flex-shrink: 0;

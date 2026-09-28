@@ -264,10 +264,10 @@ export default function App() {
             onSelect={setSelectedId}
             onOpenPlace={() => go('place')}
             onMarkerOpen={(id) => { setSelectedId(id); go('place'); }}
-            customCount={customChain.length}
-            inChain={inChain}
-            onToggleChain={toggleChain}
-            onOpenCustom={() => go('custom')}
+            myList={customChain}
+            inMy={inChain}
+            onToggleMy={toggleChain}
+            onRemoveMy={removeFromChain}
             onRoute={() => selected && openRoute(selected)}
             onEdit={() => setSheet('edit')}
             onMode={setMode}

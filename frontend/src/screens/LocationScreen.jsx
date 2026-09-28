@@ -8,17 +8,11 @@ import { hasGeocoder, reverseGeocode } from '../lib/geocoder.js';
 
 // Без кнопки «Ввести адрес» шторке не нужна её высота.
 const SHEET = hasGeocoder ? 392 : 328;
-// Свёрнутая высота: остаётся заголовок-«бугорок», а карта открывается для
-// ручного выбора точки. Тянешь вверх — возвращаются кнопки.
-const SHEET_MIN = 150;
 
 export default function LocationScreen({ theme, start, label, onConfirm, onAddress, onHistory }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
   // Подпись места под центром карты — определяем по координатам (обратный геокод).
   const [here, setHere] = useState(null);
-  // Текущая высота шторки — по ней держим отступ карты, чтобы перекрестие
-  // стояло по центру ВИДИМОЙ части, даже когда шторку свернули.
-  const [sheetH, setSheetH] = useState(SHEET);
 
   // Адрес выбирают на отдельном экране — возвращаясь, переносим карту туда.
   useEffect(() => {
@@ -61,7 +55,7 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
         theme={theme}
         center={coords}
         zoom={zoom}
-        bottomInset={sheetH}
+        bottomInset={SHEET}
         centerPin
         recenterKey={start?.join()}
         onCenterChange={setCoords}
@@ -80,7 +74,7 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
           <Icon name="history" size={21} />
         </button>
 
-        <Sheet snap={[SHEET_MIN, SHEET]} initial={SHEET} onHeight={setSheetH}>
+        <Sheet height={SHEET}>
           <div className="row">
             <div
               style={{

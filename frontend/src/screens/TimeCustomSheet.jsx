@@ -59,9 +59,7 @@ export default function TimeCustomSheet({ minutes, startAt, onApply, onClose }) 
           </button>
         </div>
 
-        <div className="spacer" />
-
-        <Button onClick={() => onApply(value)}>Готово</Button>
+        <Button style={{ marginTop: 12 }} onClick={() => onApply(value)}>Готово</Button>
       </Sheet>
     </>
   );
