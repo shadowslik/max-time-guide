@@ -321,9 +321,14 @@ export default function App() {
             start={start}
             label={startLabel}
             onConfirm={(coords) => {
+              // Сдвинул карту от выбранного адреса — подпись улицы больше не
+              // актуальна (сравниваем по значению: getCenter отдаёт новый массив).
+              const moved =
+                !startLabel ||
+                Math.abs(coords[0] - start[0]) > 1e-4 ||
+                Math.abs(coords[1] - start[1]) > 1e-4;
               setStart(coords);
-              // Точку взяли с карты, а не из поиска — подпись адреса больше не актуальна.
-              if (coords !== start) setStartLabel(null);
+              if (moved) setStartLabel(null);
               go('time');
             }}
             onAddress={() => go('address')}
