@@ -13,21 +13,27 @@ export async function searchRemote(minutes, interestIds, from) {
   const data = await response.json();
 
   const places = data.places ?? [];
-  let chain = null;
-  if (data.chain) {
-    const byId = Object.fromEntries(places.map((p) => [p.id, p]));
-    const legs = (data.chain.legs ?? [])
+  const byId = Object.fromEntries(places.map((p) => [p.id, p]));
+
+  const toChain = (c) => {
+    if (!c) return null;
+    const legs = (c.legs ?? [])
       .map((l) => ({ place: byId[l.placeId], walk: l.walk, visit: l.visit }))
       .filter((l) => l.place);
-    if (legs.length >= 2) {
-      chain = {
-        score: 0,
-        total: data.chain.total,
-        buffer: data.chain.buffer,
-        walkBack: data.chain.walkBack,
-        legs,
-      };
-    }
-  }
-  return { places, chain };
+    if (legs.length < 2) return null;
+    return {
+      score: 0,
+      total: c.total,
+      buffer: c.buffer,
+      walkBack: c.walkBack,
+      interests: c.interests ?? [],
+      legs,
+    };
+  };
+
+  // Бэк отдаёт варианты цепочек (chains); chain — первый для совместимости.
+  const chains = (data.chains ?? (data.chain ? [data.chain] : []))
+    .map(toChain)
+    .filter(Boolean);
+  return { places, chain: chains[0] ?? null, chains };
 }

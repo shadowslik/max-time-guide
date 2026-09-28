@@ -142,11 +142,15 @@ function ChainPanel({ chain, minutes, startAt, onOpen }) {
 }
 
 export default function ResultsScreen({
-  theme, start, origin, minutes, interests, results, selected, chain, mode, startAt,
+  theme, start, origin, minutes, interests, results, selected, chain, chains = [], mode, startAt,
   onSelect, onOpenPlace, onMarkerOpen, onRoute, onEdit, onBack, onMode,
   customCount = 0, inChain, onToggleChain, onOpenCustom,
 }) {
-  const chainMode = mode === 'chain' && Boolean(chain);
+  // Вариантов цепочки может быть несколько (когда времени не хватило на все интересы).
+  const variants = chains.length ? chains : chain ? [chain] : [];
+  const [variantIdx, setVariantIdx] = useState(0);
+  const activeChain = variants[Math.min(variantIdx, variants.length - 1)] ?? null;
+  const chainMode = mode === 'chain' && Boolean(activeChain);
 
   const found = results.length;
   const fits = results.filter((p) => p.eval.status !== 'no').length;
@@ -159,7 +163,7 @@ export default function ResultsScreen({
 
   // Точки обхода для режима цепочки: старт → места → обратно.
   const chainPoints = chainMode
-    ? [start, ...chain.legs.map((leg) => leg.place.coords), start]
+    ? [start, ...activeChain.legs.map((leg) => leg.place.coords), start]
     : null;
   const [chainRoute, setChainRoute] = useState(null);
 
@@ -177,10 +181,10 @@ export default function ResultsScreen({
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chainMode, chain?.legs.map((l) => l.place.id).join()]);
+  }, [chainMode, activeChain?.legs.map((l) => l.place.id).join()]);
 
   const markers = chainMode
-    ? chain.legs.map((leg, index) => ({
+    ? activeChain.legs.map((leg, index) => ({
         id: leg.place.id,
         coords: leg.place.coords,
         tone: 'ok',
@@ -210,7 +214,7 @@ export default function ResultsScreen({
     <div className="screen screen--map">
       <MapCanvas
         theme={theme}
-        center={chainMode ? chain.legs[0].place.coords : selected?.coords ?? start}
+        center={chainMode ? activeChain.legs[0].place.coords : selected?.coords ?? start}
         zoom={chainMode ? 14 : CITY.zoom}
         user={{ coords: start }}
         markers={markers}
@@ -278,15 +282,45 @@ export default function ResultsScreen({
             onChange={onMode}
             items={[
               { id: 'single', label: 'Одно место' },
-              { id: 'chain', label: chain ? `Цепочка · ${chain.legs.length} места` : 'Цепочка' },
+              { id: 'chain', label: activeChain ? `Цепочка · ${activeChain.legs.length} места` : 'Цепочка' },
             ]}
           />
 
+          {/* Варианты цепочки: когда времени не хватило на все интересы — выбор. */}
+          {chainMode && variants.length > 1 && (
+            <>
+              <div className="section-label mt-16" style={{ marginBottom: 8 }}>
+                На всё сразу времени мало — выбери вариант
+              </div>
+              <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 2 }}>
+                {variants.map((v, i) => {
+                  const active = i === Math.min(variantIdx, variants.length - 1);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => setVariantIdx(i)}
+                      style={{
+                        flexShrink: 0, padding: '8px 14px', borderRadius: 999, cursor: 'pointer',
+                        border: `1.5px solid ${active ? 'var(--accent)' : 'var(--sep)'}`,
+                        background: active ? 'var(--accent-soft)' : 'var(--surface)',
+                        color: active ? 'var(--accent-soft-text)' : 'var(--text)',
+                        fontSize: 13, fontWeight: 650, whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {interestsLabel(v.interests, INTERESTS) || `Вариант ${i + 1}`}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
           {/* key по режиму — панель пересоздаётся и проигрывает появление */}
-          <div className="panel-swap" key={chainMode ? 'chain' : 'single'}>
+          <div className="panel-swap" key={chainMode ? `chain-${variantIdx}` : 'single'}>
             {chainMode ? (
               <ChainPanel
-                chain={chain}
+                chain={activeChain}
                 minutes={minutes}
                 startAt={startAt}
                 onOpen={() => openExternal(externalRouteUrl(chainPoints))}

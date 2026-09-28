@@ -118,10 +118,11 @@ export default function CustomChainScreen({ theme, start, minutes, startAt, chai
             </p>
           ) : (
             <>
-              <div className="mt-18">
+              {/* Мест может быть много — список прокручиваем, кнопка остаётся видна. */}
+              <div className="mt-18" style={{ maxHeight: 250, overflowY: 'auto', margin: '18px -4px 0', padding: '0 4px' }}>
                 <Timeline items={timeline} />
               </div>
-              <div className="spacer" />
+              <div className="spacer" style={{ minHeight: 12 }} />
               <Button onClick={() => openExternal(externalRouteUrl(points))}>
                 <Icon name="external" size={19} />
                 Открыть маршрут

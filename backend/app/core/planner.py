@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 from datetime import datetime, timezone
-from typing import List, Optional, Tuple
+from typing import List, Optional, Sequence, Tuple
 
 from backend.app.data.sources import fetch_places
 from backend.app.models.schemas import (
@@ -19,6 +20,7 @@ from backend.app.models.schemas import (
 BUFFER = 10
 WALK_SPEED = 4.8  # км/ч
 DETOUR = 1.3
+MIN_RATING = 4.5  # показываем только качественные места: оценка 4.5+ и с отзывами
 
 
 def _haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
@@ -66,6 +68,13 @@ def search_places(req: SearchRequest) -> SearchResponse:
 
     for p in catalog:
         if not _filter_interests(p, req.interests):
+            continue
+
+        # Только проверенно-хорошие места: оценка 4.5+ и с реальными отзывами.
+        # Без отзывов (в т.ч. «★5 при 0 отзывов»), события и OSM без оценки — прячем.
+        rating = p.get("rating")
+        reviews = p.get("reviewCount") or 0
+        if rating is None or reviews <= 0 or rating < MIN_RATING:
             continue
 
         coords = (p["coords"][0], p["coords"][1])
@@ -120,59 +129,84 @@ def search_places(req: SearchRequest) -> SearchResponse:
     evaluated.sort(key=lambda x: (order[x.eval.status], x.eval.road))
 
     fits_n = sum(1 for x in evaluated if x.eval.status == "fits")
-    chain = _best_chain(start, evaluated, minutes)
+    chains = build_chains(start, evaluated, minutes, req.interests)
 
     return SearchResponse(
         found=len(evaluated),
         fits=fits_n,
         places=evaluated,
-        chain=chain,
+        chain=chains[0] if chains else None,
+        chains=chains,
     )
 
 
 CHAIN_MAX = 6  # больше не набираем: визиты дробятся, и точек для роутера станет >10
 CHAIN_RETURN_BUFFER = 10  # домой возвращаемся минимум за 10 минут до конца лимита
-CHAIN_MIN_RATING = 4.0    # в цепочку — только хорошие места (или без оценки: судить нельзя)
+CHAIN_VARIANTS_MAX = 3    # сколько вариантов цепочки предлагать, если всё не влезло
 
 
-def _best_chain(
+def _covering_chain(
     start: Tuple[float, float],
     places: List[PlaceOut],
     minutes: int,
+    target: Sequence[str],
 ) -> Optional[ChainOut]:
-    """Жадная цепочка из ближайших мест с высокой оценкой. Набираем столько,
-    чтобы вернуться домой не позже, чем за 10 минут до конца лимита времени."""
-    budget = minutes - CHAIN_RETURN_BUFFER  # к этому времени должны быть дома
-    remaining = [
+    """Жадная цепочка, покрывающая ВСЕ интересы из target (по месту на интерес),
+    ближайшими качественными местами, с возвратом за 10 минут до конца лимита.
+    Если покрыть все интересы в срок не удаётся — None."""
+    budget = minutes - CHAIN_RETURN_BUFFER
+    needed = set(target)
+    pool = [
         p for p in places
-        if p.eval.status != "no" and (p.rating is None or p.rating >= CHAIN_MIN_RATING)
+        if p.eval.status != "no" and (set(p.interests) & needed)
     ]
-    if not remaining:
-        return None
 
     legs: List[ChainLeg] = []
     current = start
-    spent = 0  # уже потраченные дорога + визиты
+    spent = 0
+    used: set = set()
+    covered: set = set()
 
-    while remaining and len(legs) < CHAIN_MAX:
-        best = None
-        best_walk = 0
-        for p in remaining:
-            coords = (p.coords[0], p.coords[1])
-            w = walk_min(current, coords)
-            back = walk_min(coords, start)
-            # дойти, постоять и вернуться домой, оставив запас в 10 минут
+    def nearest(only_needed: bool):
+        best, best_walk = None, 0
+        for p in pool:
+            if p.id in used:
+                continue
+            if only_needed and not (set(p.interests) & (needed - covered)):
+                continue
+            c = (p.coords[0], p.coords[1])
+            w = walk_min(current, c)
+            back = walk_min(c, start)
             if spent + w + p.eval.visit + back <= budget:
                 if best is None or w < best_walk:
                     best, best_walk = p, w
+        return best, best_walk
+
+    # 1) покрываем каждый нужный интерес ближайшим подходящим местом
+    while (needed - covered) and len(legs) < CHAIN_MAX:
+        best, best_walk = nearest(only_needed=True)
         if best is None:
             break
         legs.append(ChainLeg(placeId=best.id, walk=best_walk, visit=best.eval.visit))
         spent += best_walk + best.eval.visit
         current = (best.coords[0], best.coords[1])
-        remaining.remove(best)
+        used.add(best.id)
+        covered |= set(best.interests) & needed
 
-    if len(legs) < 2:  # цепочка имеет смысл от двух мест
+    if needed - covered:  # не уложились по времени под все интересы combo
+        return None
+
+    # 2) если одно место закрыло несколько интересов — добьём цепочку до 2 точек
+    while len(legs) < 2 and len(legs) < CHAIN_MAX:
+        best, best_walk = nearest(only_needed=False)
+        if best is None:
+            break
+        legs.append(ChainLeg(placeId=best.id, walk=best_walk, visit=best.eval.visit))
+        spent += best_walk + best.eval.visit
+        current = (best.coords[0], best.coords[1])
+        used.add(best.id)
+
+    if len(legs) < 2:
         return None
 
     walk_back = walk_min(current, start)
@@ -182,4 +216,57 @@ def _best_chain(
         buffer=max(0, minutes - total),
         walkBack=walk_back,
         legs=legs,
+        interests=sorted(covered),
     )
+
+
+def build_chains(
+    start: Tuple[float, float],
+    places: List[PlaceOut],
+    minutes: int,
+    interests: Sequence[str],
+) -> List[ChainOut]:
+    """Строим цепочки под выбранные интересы.
+
+    • Хватает времени на все интересы → одна цепочка со всеми.
+    • Не хватает → варианты по подмножествам (убираем по одному интересу):
+      напр. еда+культура+прогулка не влезает → предлагаем еда+культура,
+      еда+прогулка, культура+прогулка — те, что укладываются.
+    """
+    reachable = [p for p in places if p.eval.status != "no"]
+    if not reachable:
+        return []
+
+    # интересы, по которым реально есть места рядом
+    available = {i for p in reachable for i in (p.interests or [])}
+    target = [i for i in dict.fromkeys(interests or []) if i in available]
+
+    # интересы не заданы (или ни одного совпадения) — обычная жадная цепочка
+    if not target:
+        chain = _covering_chain(start, reachable, minutes, sorted(available))
+        return [chain] if chain else []
+
+    # 1) пробуем покрыть все выбранные интересы
+    full = _covering_chain(start, reachable, minutes, target)
+    if full:
+        return [full]
+
+    # 2) времени на всё не хватило — варианты по подмножествам (по убыванию размера,
+    # вплоть до одиночного интереса: лучше предложить цепочку хотя бы по одному).
+    for k in range(len(target) - 1, 0, -1):
+        variants: List[ChainOut] = []
+        seen: set = set()
+        for combo in itertools.combinations(target, k):
+            ch = _covering_chain(start, reachable, minutes, combo)
+            if not ch:
+                continue
+            key = tuple(sorted(leg.placeId for leg in ch.legs))
+            if key in seen:
+                continue
+            seen.add(key)
+            variants.append(ch)
+        if variants:
+            variants.sort(key=lambda c: (-len(c.legs), c.total))
+            return variants[:CHAIN_VARIANTS_MAX]
+
+    return []

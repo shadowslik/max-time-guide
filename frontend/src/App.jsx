@@ -34,6 +34,7 @@ export default function App() {
   const [interests, setInterests] = useState(DEFAULT_INTERESTS);
   const [results, setResults] = useState([]);
   const [chain, setChain] = useState(null);
+  const [chains, setChains] = useState([]); // варианты цепочек под выбранные интересы
   const [searchReady, setSearchReady] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
   const [start, setStart] = useState(CITY.start);
@@ -111,14 +112,16 @@ export default function App() {
       });
 
       searchRemote(nextMinutes, nextInterests, start)
-        .then(({ places, chain: nextChain }) => {
+        .then(({ places, chain: nextChain, chains: nextChains }) => {
           setResults(places);
           setChain(nextChain);
+          setChains(nextChains ?? []);
           setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
         })
         .catch(() => {
           setResults([]);
           setChain(null);
+          setChains([]);
           setSelectedId(null);
         })
         .finally(() => setSearchReady(true));
@@ -182,14 +185,16 @@ export default function App() {
       replace('location', 'results', 'loading');
 
       searchRemote(nextMinutes, nextInterests, start)
-        .then(({ places, chain: nextChain }) => {
+        .then(({ places, chain: nextChain, chains: nextChains }) => {
           setResults(places);
           setChain(nextChain);
+          setChains(nextChains ?? []);
           setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
         })
         .catch(() => {
           setResults([]);
           setChain(null);
+          setChains([]);
           setSelectedId(null);
         })
         .finally(() => setSearchReady(true));
@@ -253,6 +258,7 @@ export default function App() {
             results={results}
             selected={selected}
             chain={chain}
+            chains={chains}
             mode={mode}
             startAt={startAt}
             onSelect={setSelectedId}

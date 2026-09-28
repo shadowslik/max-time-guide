@@ -57,13 +57,15 @@ class ChainOut(BaseModel):
     buffer: int
     walkBack: int
     legs: List[ChainLeg]
+    interests: List[str] = Field(default_factory=list)  # какие интересы покрывает вариант
 
 
 class SearchResponse(BaseModel):
     found: int
     fits: int
     places: List[PlaceOut]
-    chain: Optional[ChainOut] = None
+    chain: Optional[ChainOut] = None            # лучший вариант (для совместимости)
+    chains: List[ChainOut] = Field(default_factory=list)  # варианты цепочек на выбор
 
 
 class RouteRequest(BaseModel):
