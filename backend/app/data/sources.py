@@ -261,7 +261,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=12, limit=80) -> 
     out: List[dict] = []
     by_id: dict = {}
 
-    with httpx.Client(timeout=15.0, headers=HEADERS) as client:
+    with httpx.Client(timeout=8.0, headers=HEADERS) as client:
         for q, q_ints in qmap.items():
             params = {
                 "q": q, "point": point, "radius": radius_m,
@@ -495,12 +495,16 @@ def fetch_places(start, interests, minutes=120) -> List[dict]:
     if cached is not None:
         return cached
 
-    places = None
-    try:
-        places = fetch_2gis_places(start, interests, minutes)  # None, если ключа нет
-    except Exception as e:  # noqa: BLE001
-        log.warning("2gis упал: %s", e)
-    if not places:  # ключа нет или пусто — берём OSM
+    if TWOGIS_KEY:
+        # 2ГИС основной и надёжный — в медленный/нестабильный OSM не лезем вовсе,
+        # иначе при пустом ответе 2ГИС запрос завис бы на ретраях Overpass.
+        try:
+            places = fetch_2gis_places(start, interests, minutes) or []
+        except Exception as e:  # noqa: BLE001
+            log.warning("2gis упал: %s", e)
+            places = []
+    else:
+        # Ключа 2ГИС нет — работаем на OSM, запасной каталог только рядом с Казанью.
         try:
             places = fetch_osm_places(start, interests, minutes)
         except Exception as e:
