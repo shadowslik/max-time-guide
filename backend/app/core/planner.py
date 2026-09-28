@@ -131,6 +131,8 @@ def search_places(req: SearchRequest) -> SearchResponse:
 
 
 CHAIN_MAX = 6  # больше не набираем: визиты дробятся, и точек для роутера станет >10
+CHAIN_RETURN_BUFFER = 10  # домой возвращаемся минимум за 10 минут до конца лимита
+CHAIN_MIN_RATING = 4.0    # в цепочку — только хорошие места (или без оценки: судить нельзя)
 
 
 def _best_chain(
@@ -138,9 +140,13 @@ def _best_chain(
     places: List[PlaceOut],
     minutes: int,
 ) -> Optional[ChainOut]:
-    """Жадная цепочка на несколько мест: с текущей точки идём в ближайшее место,
-    которое ещё позволяет вернуться домой в срок. Набираем сколько влезает."""
-    remaining = [p for p in places if p.eval.status != "no"]
+    """Жадная цепочка из ближайших мест с высокой оценкой. Набираем столько,
+    чтобы вернуться домой не позже, чем за 10 минут до конца лимита времени."""
+    budget = minutes - CHAIN_RETURN_BUFFER  # к этому времени должны быть дома
+    remaining = [
+        p for p in places
+        if p.eval.status != "no" and (p.rating is None or p.rating >= CHAIN_MIN_RATING)
+    ]
     if not remaining:
         return None
 
@@ -155,8 +161,8 @@ def _best_chain(
             coords = (p.coords[0], p.coords[1])
             w = walk_min(current, coords)
             back = walk_min(coords, start)
-            # успеваем дойти, постоять и всё равно вернуться домой к сроку
-            if spent + w + p.eval.visit + back <= minutes:
+            # дойти, постоять и вернуться домой, оставив запас в 10 минут
+            if spent + w + p.eval.visit + back <= budget:
                 if best is None or w < best_walk:
                     best, best_walk = p, w
         if best is None:
