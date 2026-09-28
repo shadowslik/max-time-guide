@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
+import threading
 import time
 from typing import List, Optional
 
@@ -19,13 +20,34 @@ from backend.app.data.places import PLACES  # запасной каталог �
 
 log = logging.getLogger(__name__)
 
-# Зеркала Overpass: если одно недоступно/лимитит — идём к следующему. Без этого
-# один сбой overpass-api.de ронял поиск в запасной каталог другого города.
+# Кэш результатов подбора: Overpass медленный и нестабильный, поэтому удачный
+# ответ держим 30 минут — повторные запросы из того же места мгновенны и надёжны.
+_CACHE: dict = {}
+_CACHE_TTL = 1800.0
+_CACHE_LOCK = threading.Lock()
+
+
+def _cache_get(key):
+    with _CACHE_LOCK:
+        item = _CACHE.get(key)
+    if item and time.time() - item[0] < _CACHE_TTL:
+        return item[1]
+    return None
+
+
+def _cache_put(key, value):
+    with _CACHE_LOCK:
+        _CACHE[key] = (time.time(), value)
+
+
+# Зеркала Overpass: если одно недоступно/лимитит — идём к следующему. mail.ru
+# первым: он в РФ и с нашего сервера отвечает стабильнее зарубежных.
 OVERPASS_URLS = [
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
-    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
+OVERPASS_TRIES = 2  # инфраструктура Overpass перегружена — пробуем список дважды
 KUDAGO_URL = "https://kudago.com/public-api/v1.4/events/"
 # Культура.РФ / ЕИПСК — события по всей России (в т.ч. там, где нет KudaGo).
 CULTURE_URLS = [
@@ -131,15 +153,16 @@ def _visit_time(tags: dict):
 def _overpass(query: str) -> list:
     """Первое ответившее зеркало Overpass. Кидает исключение, если молчат все."""
     last = None
-    for url in OVERPASS_URLS:
-        try:
-            with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
-                r = client.post(url, data={"data": query})
-                r.raise_for_status()
-                return r.json().get("elements", [])
-        except Exception as e:  # noqa: BLE001 — пробуем следующее зеркало
-            last = e
-            log.warning("overpass %s недоступен: %s", url, e)
+    for _ in range(OVERPASS_TRIES):
+        for url in OVERPASS_URLS:
+            try:
+                with httpx.Client(timeout=TIMEOUT, headers=HEADERS) as client:
+                    r = client.post(url, data={"data": query})
+                    r.raise_for_status()
+                    return r.json().get("elements", [])
+            except Exception as e:  # noqa: BLE001 — пробуем следующее зеркало
+                last = e
+                log.warning("overpass %s недоступен: %s", url, e)
     raise last if last else RuntimeError("overpass: нет зеркал")
 
 
@@ -299,10 +322,10 @@ def fetch_culture_events(start, minutes=120, limit=40) -> List[dict]:
     data = None
     for url in CULTURE_URLS:
         try:
-            with httpx.Client(timeout=20.0, headers=HEADERS) as client:
+            with httpx.Client(timeout=20.0, headers=HEADERS, follow_redirects=True) as client:
                 r = client.get(url, params=params)
                 if r.status_code != 200:
-                    log.warning("culture %s → %s", url, r.status_code)
+                    log.warning("culture %s → %s (итог %s)", url, r.status_code, r.url)
                     continue
                 data = r.json()
                 break
@@ -362,6 +385,16 @@ def fetch_places(start, interests, minutes=120) -> List[dict]:
     Радиус растёт со временем. При сбое OSM запасной каталог берём только рядом с
     Казанью — в других городах лучше показать пусто, чем чужие места.
     """
+    # Ключ кэша: место (~100 м), корзина времени (радиус) и набор интересов.
+    key = (
+        round(start[0], 3), round(start[1], 3),
+        _reachable_radius_m(minutes),
+        tuple(sorted(interests or [])),
+    )
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+
     try:
         places = fetch_osm_places(start, interests, minutes)
     except Exception as e:
@@ -372,9 +405,13 @@ def fetch_places(start, interests, minutes=120) -> List[dict]:
     events = fetch_culture_events(start, minutes) + fetch_kudago_events(start, minutes)
     seen, uniq = set(), []
     for e in events:
-        key = (e["name"].lower(), round(e["coords"][0], 4), round(e["coords"][1], 4))
-        if key in seen:
+        ekey = (e["name"].lower(), round(e["coords"][0], 4), round(e["coords"][1], 4))
+        if ekey in seen:
             continue
-        seen.add(key)
+        seen.add(ekey)
         uniq.append(e)
-    return places + uniq
+
+    result = places + uniq
+    if result:  # пустое не кэшируем — чтобы следующий запрос попробовал снова
+        _cache_put(key, result)
+    return result
