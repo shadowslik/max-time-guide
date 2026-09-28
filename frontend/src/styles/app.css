@@ -41,7 +41,7 @@ button { font: inherit; color: inherit; }
   -webkit-overflow-scrolling: touch;
   box-sizing: border-box;
   padding: calc(12px + env(safe-area-inset-top)) var(--gutter)
-           calc(24px + env(safe-area-inset-bottom));
+           calc(34px + env(safe-area-inset-bottom));
 }
 /* Контент не сжимаем: при нехватке места экран прокручивается, а не «схлопывает»
    плитки и кнопку. Распорка (.spacer) при этом всё равно растёт, когда место есть. */
@@ -129,7 +129,7 @@ button { font: inherit; color: inherit; }
 
 .btn--primary { background: var(--accent); color: #FFFFFF; }
 .btn--primary:hover { background: var(--accent-hover); }
-.btn--secondary { height: 50px; background: var(--surface-muted); color: var(--text); font-size: 16px; font-weight: 600; }
+.btn--secondary { height: 54px; background: var(--surface-muted); color: var(--text); font-size: 16px; font-weight: 600; }
 .btn--ghost { height: 42px; background: transparent; color: var(--accent-text); font-size: 15px; font-weight: 600; }
 .btn--quiet { color: var(--text-2); }
 .btn + .btn { margin-top: 10px; }
@@ -160,7 +160,7 @@ button { font: inherit; color: inherit; }
   background: var(--surface);
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
   box-shadow: var(--shadow-sheet);
-  padding: 10px var(--gutter) calc(24px + env(safe-area-inset-bottom));
+  padding: 10px var(--gutter) calc(32px + env(safe-area-inset-bottom));
 }
 .sheet--fill { height: 100%; overflow-y: auto; }
 .sheet--flat { box-shadow: none; }

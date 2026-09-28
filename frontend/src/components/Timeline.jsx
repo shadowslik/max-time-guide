@@ -10,7 +10,7 @@ function Mark({ item }) {
     const bg = item.tone === 'warn' ? 'var(--warn-text)' : 'var(--ok-text)';
     return (
       <span className="timeline__mark timeline__mark--finish" style={{ background: bg }}>
-        <Icon name="home" size={14} />
+        <Icon name="home" size={11} />
       </span>
     );
   }

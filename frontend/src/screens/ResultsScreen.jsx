@@ -276,7 +276,7 @@ export default function ResultsScreen({
           </div>
         )}
 
-        <Sheet snap={chainMode ? [300, 560] : [300, 620]}>
+        <Sheet snap={chainMode ? [188, 340, 560] : [188, 340, 620]} initial={340}>
           <Segmented
             value={chainMode ? 'chain' : 'single'}
             onChange={onMode}

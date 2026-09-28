@@ -31,7 +31,7 @@ function useViewportHeight() {
   return value;
 }
 
-export default function Sheet({ height, snap, onDismiss, fill, children, className = '', style }) {
+export default function Sheet({ height, snap, initial, onDismiss, onHeight, fill, children, className = '', style }) {
   const viewport = useViewportHeight();
 
   const points = useMemo(() => {
@@ -46,7 +46,10 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
   const stops = useMemo(() => points.map((p) => max - p).sort((a, b) => a - b), [points, max]);
   const draggable = points.length > 1 || Boolean(onDismiss);
 
-  const [offset, setOffset] = useState(() => max - points[0]);
+  // Стартовая высота: по умолчанию наименьший снап, но экран может открыть
+  // шторку сразу развёрнутой/в среднем положении через проп initial.
+  const startAt = initial != null ? Math.min(Math.max(initial, points[0]), max) : points[0];
+  const [offset, setOffset] = useState(() => max - startAt);
   const [dragging, setDragging] = useState(false);
   const gesture = useRef(null);
   const wrapRef = useRef(null);
@@ -57,8 +60,10 @@ export default function Sheet({ height, snap, onDismiss, fill, children, classNa
   useEffect(() => {
     const host = wrapRef.current?.closest('.map');
     if (!host) return undefined;
-    host.style.setProperty('--sheet-h', `${Math.max(0, max - offset)}px`);
+    const visible = Math.max(0, max - offset);
+    host.style.setProperty('--sheet-h', `${visible}px`);
     host.classList.toggle('map--sheet-dragging', dragging);
+    onHeight?.(visible);
     return () => {
       host.style.removeProperty('--sheet-h');
       host.classList.remove('map--sheet-dragging');
