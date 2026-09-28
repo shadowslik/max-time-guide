@@ -322,15 +322,11 @@ export default function App() {
             theme={scheme}
             start={start}
             label={startLabel}
-            onConfirm={(coords) => {
-              // Сдвинул карту от выбранного адреса — подпись улицы больше не
-              // актуальна (сравниваем по значению: getCenter отдаёт новый массив).
-              const moved =
-                !startLabel ||
-                Math.abs(coords[0] - start[0]) > 1e-4 ||
-                Math.abs(coords[1] - start[1]) > 1e-4;
+            onConfirm={(coords, lbl) => {
+              // Подпись места (выбранный адрес или определённое по координатам)
+              // несём дальше, чтобы шаги 2–3 показывали её, а не всегда «Казань».
               setStart(coords);
-              if (moved) setStartLabel(null);
+              setStartLabel(lbl ? { title: lbl.title, subtitle: lbl.subtitle } : null);
               go('time');
             }}
             onAddress={() => go('address')}

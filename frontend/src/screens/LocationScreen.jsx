@@ -4,13 +4,15 @@ import Icon from '../components/Icon.jsx';
 import MapCanvas from '../components/MapCanvas.jsx';
 import { Button, Sheet, Steps } from '../components/ui.jsx';
 import { CITY } from '../data/places.js';
-import { hasGeocoder } from '../lib/geocoder.js';
+import { hasGeocoder, reverseGeocode } from '../lib/geocoder.js';
 
 // Без кнопки «Ввести адрес» шторке не нужна её высота.
 const SHEET = hasGeocoder ? 392 : 328;
 
 export default function LocationScreen({ theme, start, label, onConfirm, onAddress, onHistory }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
+  // Подпись места под центром карты — определяем по координатам (обратный геокод).
+  const [here, setHere] = useState(null);
 
   // Адрес выбирают на отдельном экране — возвращаясь, переносим карту туда.
   useEffect(() => {
@@ -18,12 +20,29 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
   }, [start]);
 
   // Пока метка стоит ровно на выбранном адресе — показываем его улицу, а не
-  // город. Стоит подвинуть карту — точка уже не та, возвращаем название города.
+  // город. Стоит подвинуть карту — точка уже не та, берём подпись по координатам.
   const onPicked =
     label && start &&
     Math.abs(coords[0] - start[0]) < 1e-4 &&
     Math.abs(coords[1] - start[1]) < 1e-4;
-  const place = onPicked ? label.title : CITY.name;
+
+  // Двигают карту — спрашиваем у бэка, что за место под меткой (с задержкой,
+  // чтобы не дёргать на каждый сдвиг). Выбранный адрес перекрываем его подписью.
+  useEffect(() => {
+    if (onPicked) return undefined;
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      const found = await reverseGeocode(coords, controller.signal);
+      if (found) setHere(found);
+    }, 400);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, [coords, onPicked]);
+
+  const current = onPicked ? label : here;
+  const place = current?.title || CITY.name;
   // Выбранный адрес показываем крупно (метка на доме), свободный поиск — обзорно.
   const zoom = label ? 17 : 15;
 
@@ -83,7 +102,7 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
             {coords[1].toFixed(4)}, {coords[0].toFixed(4)}
           </div>
 
-          <Button className="mt-10" onClick={() => onConfirm(coords)}>Я здесь</Button>
+          <Button className="mt-10" onClick={() => onConfirm(coords, current)}>Я здесь</Button>
           {/* Без ключа геокодера искать нечем — кнопку не показываем,
               чтобы она не вела на пустой экран. */}
           {hasGeocoder && (

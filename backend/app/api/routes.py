@@ -90,6 +90,16 @@ async def api_geocode(
     return GeocodeResponse(results=results)
 
 
+@router.get("/reverse")
+async def api_reverse(
+    lat: float = Query(..., ge=-90, le=90),
+    lon: float = Query(..., ge=-180, le=180),
+):
+    """Координаты центра карты → короткая подпись (город/улица)."""
+    label = await geocode_mod.reverse_address(lat, lon)
+    return label or {"title": None, "subtitle": None}
+
+
 @router.get("/interests", response_model=InterestsResponse)
 def api_interests():
     return InterestsResponse(interests=INTERESTS)

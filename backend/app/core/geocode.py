@@ -16,6 +16,49 @@ log = logging.getLogger(__name__)
 TIMEOUT = 12.0
 USER_AGENT = "max-time-guide/1.0"
 DADATA_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/suggest/address"
+DADATA_GEOLOCATE_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address"
+
+
+def _label_from_dadata(d: dict) -> dict:
+    """Из данных DaData собираем короткую подпись: улица+дом или город."""
+    city = d.get("city_with_type") or d.get("settlement_with_type") or d.get("region_with_type")
+    region = d.get("region_with_type")
+    street = d.get("street_with_type") or ""
+    house = d.get("house") or ""
+    if street:
+        title = f"{street}, {house}".strip(", ") if house else street
+        subtitle = city or region or "Россия"
+    else:
+        title = city or region or "Россия"
+        subtitle = region if region and region != title else "Россия"
+    return {"title": title, "subtitle": subtitle}
+
+
+async def reverse_address(lat: float, lon: float) -> dict | None:
+    """Координаты → ближайший адрес (город/улица). DaData geolocate."""
+    if not DADATA_TOKEN:
+        return None
+    headers = {
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "Authorization": f"Token {DADATA_TOKEN}",
+    }
+    body = {"lat": lat, "lon": lon, "count": 1}
+    try:
+        async with httpx.AsyncClient(timeout=TIMEOUT) as client:
+            r = await client.post(DADATA_GEOLOCATE_URL, headers=headers, json=body)
+            if r.status_code != 200:
+                log.warning("dadata geolocate %s", r.status_code)
+                return None
+            data = r.json()
+    except Exception as e:  # noqa: BLE001
+        log.warning("dadata geolocate fail: %s", e)
+        return None
+
+    suggestions = data.get("suggestions") or []
+    if not suggestions:
+        return None
+    return _label_from_dadata(suggestions[0].get("data") or {})
 
 
 async def _dadata(q: str, limit: int):

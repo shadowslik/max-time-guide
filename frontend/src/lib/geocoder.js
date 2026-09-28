@@ -7,6 +7,22 @@
 // Адресный поиск теперь всегда доступен (эндпоинт на бэке есть).
 export const hasGeocoder = true;
 
+// Обратное геокодирование: координаты центра карты → короткая подпись
+// { title, subtitle }. coords = [долгота, широта]. При сбое — null.
+export async function reverseGeocode(coords, signal) {
+  const [lon, lat] = coords;
+  try {
+    const response = await fetch(`/api/reverse?lat=${lat}&lon=${lon}`, { signal });
+    if (!response.ok) throw new Error(`API ответил ${response.status}`);
+    const data = await response.json();
+    return data.title ? data : null;
+  } catch (error) {
+    if (error.name === 'AbortError') return null;
+    console.warn('[Рядом] Обратный геокод не сработал —', error.message);
+    return null;
+  }
+}
+
 export async function searchAddress(query, signal) {
   const text = query.trim();
   if (text.length < 3) return [];
