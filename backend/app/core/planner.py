@@ -62,7 +62,7 @@ def search_places(req: SearchRequest) -> SearchResponse:
     evaluated: List[PlaceOut] = []
 
     # реальные данные: места (OSM) + мероприятия (KudaGo)
-    catalog = fetch_places(start, req.interests)
+    catalog = fetch_places(start, req.interests, minutes)
 
     for p in catalog:
         if not _filter_interests(p, req.interests):
