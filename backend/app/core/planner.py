@@ -104,6 +104,8 @@ def search_places(req: SearchRequest) -> SearchResponse:
                 walkTo=walk_to,
                 walkBack=walk_back,
                 distance=_fmt_dist(dist_m),
+                rating=p.get("rating"),
+                reviewCount=p.get("reviewCount"),
                 eval=PlaceEval(
                     status=status,
                     visit=visit,
@@ -128,64 +130,50 @@ def search_places(req: SearchRequest) -> SearchResponse:
     )
 
 
+CHAIN_MAX = 6  # больше не набираем: визиты дробятся, и точек для роутера станет >10
+
+
 def _best_chain(
     start: Tuple[float, float],
     places: List[PlaceOut],
     minutes: int,
 ) -> Optional[ChainOut]:
-    """Пара мест с max visitA+visitB, укладывающаяся в budget."""
-    candidates = [p for p in places if p.eval.status != "no"]
-    if len(candidates) < 2:
-        if len(candidates) == 1:
-            p = candidates[0]
-            total = p.walkTo + p.eval.visit + p.walkBack
-            if total <= minutes:
-                return ChainOut(
-                    total=total,
-                    buffer=max(0, minutes - total),
-                    walkBack=p.walkBack,
-                    legs=[ChainLeg(placeId=p.id, walk=p.walkTo, visit=p.eval.visit)],
-                )
+    """Жадная цепочка на несколько мест: с текущей точки идём в ближайшее место,
+    которое ещё позволяет вернуться домой в срок. Набираем сколько влезает."""
+    remaining = [p for p in places if p.eval.status != "no"]
+    if not remaining:
         return None
 
-    by_id = {p.id: p for p in candidates}
-    best = None
-    best_score = -1
+    legs: List[ChainLeg] = []
+    current = start
+    spent = 0  # уже потраченные дорога + визиты
 
-    ids = list(by_id.keys())
-    for i, id_a in enumerate(ids):
-        for id_b in ids[i + 1 :]:
-            a, b = by_id[id_a], by_id[id_b]
-            ca = (a.coords[0], a.coords[1])
-            cb = (b.coords[0], b.coords[1])
+    while remaining and len(legs) < CHAIN_MAX:
+        best = None
+        best_walk = 0
+        for p in remaining:
+            coords = (p.coords[0], p.coords[1])
+            w = walk_min(current, coords)
+            back = walk_min(coords, start)
+            # успеваем дойти, постоять и всё равно вернуться домой к сроку
+            if spent + w + p.eval.visit + back <= minutes:
+                if best is None or w < best_walk:
+                    best, best_walk = p, w
+        if best is None:
+            break
+        legs.append(ChainLeg(placeId=best.id, walk=best_walk, visit=best.eval.visit))
+        spent += best_walk + best.eval.visit
+        current = (best.coords[0], best.coords[1])
+        remaining.remove(best)
 
-            # порядок: сначала ближе к старту
-            if a.walkTo <= b.walkTo:
-                first, second = a, b
-                c1, c2 = ca, cb
-            else:
-                first, second = b, a
-                c1, c2 = cb, ca
+    if len(legs) < 2:  # цепочка имеет смысл от двух мест
+        return None
 
-            w0 = walk_min(start, c1)
-            w1 = walk_min(c1, c2)
-            w2 = walk_min(c2, start)
-            v1 = first.eval.visit
-            v2 = second.eval.visit
-            total = w0 + v1 + w1 + v2 + w2
-            if total > minutes:
-                continue
-            score = v1 + v2
-            if score > best_score:
-                best_score = score
-                best = ChainOut(
-                    total=total,
-                    buffer=minutes - total,
-                    walkBack=w2,
-                    legs=[
-                        ChainLeg(placeId=first.id, walk=w0, visit=v1),
-                        ChainLeg(placeId=second.id, walk=w1, visit=v2),
-                    ],
-                )
-
-    return best
+    walk_back = walk_min(current, start)
+    total = spent + walk_back
+    return ChainOut(
+        total=total,
+        buffer=max(0, minutes - total),
+        walkBack=walk_back,
+        legs=legs,
+    )

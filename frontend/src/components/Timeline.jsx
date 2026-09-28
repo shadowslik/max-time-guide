@@ -38,6 +38,17 @@ export default function Timeline({ items }) {
               <div className="timeline__title">{item.title}</div>
               <div className={`timeline__sub${item.tone === 'ok' ? ' timeline__sub--ok' : ''}`}>{item.sub}</div>
             </div>
+            {item.onRemove && (
+              <button
+                type="button"
+                className="icon-button"
+                style={{ width: 32, height: 32, flexShrink: 0, alignSelf: 'center' }}
+                aria-label="Убрать из маршрута"
+                onClick={item.onRemove}
+              >
+                <Icon name="close" size={16} />
+              </button>
+            )}
           </div>
         ),
       )}

@@ -5,10 +5,13 @@ import { Badge, Button, Sheet } from '../components/ui.jsx';
 import { INTERESTS } from '../data/places.js';
 import { formatBudget, interestsLabel } from '../lib/format.js';
 
-export default function PlaceScreen({ place, minutes, chain, onBack, onRoute, onChain }) {
+export default function PlaceScreen({ place, minutes, chain, inMyChain, onToggleMyChain, onBack, onRoute, onChain }) {
   const { eval: plan } = place;
   const buffer = Math.max(0, minutes - plan.road - plan.visit);
   const canChain = Boolean(chain) && buffer >= 25;
+  // Рейтинг показываем, только если есть отзывы (иначе 2ГИС отдаёт «5.0» без оснований).
+  const hasRating = Boolean(place.rating) && (place.reviewCount ?? 0) > 0;
+  const hasHours = Boolean(place.hours);
 
   const rows = [
     { color: 'var(--bar-road)', name: 'Дойти туда', value: `${place.walkTo} мин` },
@@ -34,9 +37,21 @@ export default function PlaceScreen({ place, minutes, chain, onBack, onRoute, on
             {plan.status === 'fits' ? 'Успеваешь' : plan.status === 'tight' ? 'Впритык' : 'Не успеешь'}
           </Badge>
         </div>
-        <div style={{ marginTop: 6, fontSize: 14, color: 'var(--text-2)' }}>
-          {interestsLabel(place.interests, INTERESTS)}
+        <div style={{ marginTop: 6, fontSize: 14, color: 'var(--text-2)', display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <span>{interestsLabel(place.interests, INTERESTS)}</span>
+          {hasRating && (
+            <span style={{ color: 'var(--warn-text)', fontWeight: 650 }}>
+              ★ {Number(place.rating).toFixed(1)}
+              <span style={{ color: 'var(--text-3)', fontWeight: 400 }}> · {place.reviewCount} отзывов</span>
+            </span>
+          )}
         </div>
+
+        {place.blurb && (
+          <p style={{ margin: '10px 0 0', fontSize: 14, lineHeight: 1.45, color: 'var(--text-2)' }}>
+            {place.blurb}
+          </p>
+        )}
 
         <div className="info-grid mt-18 rise" style={{ animationDelay: '60ms' }}>
           <div className="info-card">
@@ -44,11 +59,19 @@ export default function PlaceScreen({ place, minutes, chain, onBack, onRoute, on
             <span className="info-card__value">{place.price}</span>
             <span className="info-card__label">{place.priceNote}</span>
           </div>
-          <div className="info-card">
-            <span className="info-card__icon" style={{ color: 'var(--ok-text)' }}><Icon name="clock" size={18} /></span>
-            <span className="info-card__value">Открыто</span>
-            <span className="info-card__label">сегодня {place.hours}</span>
-          </div>
+          {hasRating ? (
+            <div className="info-card">
+              <span className="info-card__icon" style={{ color: 'var(--warn-text)' }}>★</span>
+              <span className="info-card__value">{Number(place.rating).toFixed(1)}</span>
+              <span className="info-card__label">{place.reviewCount} отзывов</span>
+            </div>
+          ) : (
+            <div className="info-card">
+              <span className="info-card__icon" style={{ color: 'var(--ok-text)' }}><Icon name="clock" size={18} /></span>
+              <span className="info-card__value">{hasHours ? 'Открыто' : 'Часы'}</span>
+              <span className="info-card__label">{hasHours ? `сегодня ${place.hours}` : 'уточняйте'}</span>
+            </div>
+          )}
           <div className="info-card">
             <span className="info-card__icon"><Icon name="walk" size={18} /></span>
             <span className="info-card__value">{place.distance}</span>
@@ -85,6 +108,10 @@ export default function PlaceScreen({ place, minutes, chain, onBack, onRoute, on
         <div className="spacer" style={{ minHeight: 20 }} />
 
         <Button onClick={onRoute}>Построить маршрут</Button>
+        <Button variant="secondary" onClick={onToggleMyChain}>
+          <Icon name={inMyChain ? 'check' : 'route'} size={19} />
+          {inMyChain ? 'В моём маршруте' : 'В мой маршрут'}
+        </Button>
       </Sheet>
     </div>
   );

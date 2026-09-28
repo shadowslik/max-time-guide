@@ -19,7 +19,7 @@ import { openExternal } from '../lib/maxBridge.js';
 const badgeTone = (status) => (status === 'fits' ? 'ok' : status === 'tight' ? 'warn' : 'muted');
 const statusLabel = (status) => (status === 'fits' ? 'Успеваешь' : status === 'tight' ? 'Впритык' : 'Не успеешь');
 
-function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute }) {
+function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute, inChain, onToggleChain }) {
   if (!selected) {
     return <p className="lead">Под это время ничего не нашлось. Попробуй изменить подбор.</p>;
   }
@@ -53,7 +53,18 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
         <TimeBudgetBar budget={minutes} walkTo={selected.walkTo} visit={selected.eval.visit} walkBack={selected.walkBack} />
       </div>
 
-      <Button className="mt-16" onClick={onRoute} style={{ height: 52 }}>Построить маршрут</Button>
+      <div className="row mt-16" style={{ gap: 10 }}>
+        <Button className="grow" onClick={onRoute} style={{ height: 52, margin: 0 }}>Построить маршрут</Button>
+        <button
+          type="button"
+          className="icon-button"
+          style={{ width: 52, height: 52, borderRadius: 14, flexShrink: 0, color: inChain?.(selected.id) ? 'var(--accent-text)' : 'var(--text-2)' }}
+          aria-label={inChain?.(selected.id) ? 'Убрать из моего маршрута' : 'В мой маршрут'}
+          onClick={() => onToggleChain?.(selected)}
+        >
+          <Icon name={inChain?.(selected.id) ? 'check' : 'plus'} size={22} />
+        </button>
+      </div>
 
       {others.length > 0 && (
         <>
@@ -132,7 +143,8 @@ function ChainPanel({ chain, minutes, startAt, onOpen }) {
 
 export default function ResultsScreen({
   theme, start, origin, minutes, interests, results, selected, chain, mode, startAt,
-  onSelect, onOpenPlace, onRoute, onEdit, onBack, onMode,
+  onSelect, onOpenPlace, onMarkerOpen, onRoute, onEdit, onBack, onMode,
+  customCount = 0, inChain, onToggleChain, onOpenCustom,
 }) {
   const chainMode = mode === 'chain' && Boolean(chain);
 
@@ -201,7 +213,7 @@ export default function ResultsScreen({
         route={chainMode ? chainRoute : undefined}
         fit={chainMode ? chainPoints : [start, selected?.coords]}
         bottomInset={chainMode ? 300 : 300}
-        onSelect={chainMode ? undefined : onSelect}
+        onSelect={chainMode ? undefined : (onMarkerOpen ?? onSelect)}
       >
         <div className="params drop" style={{ position: 'absolute', left: 16, right: 16, top: 16 }}>
           <button type="button" className="icon-button" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} aria-label="Назад" onClick={onBack}>
@@ -226,6 +238,18 @@ export default function ResultsScreen({
             {fits} из {plural(found, 'места', 'мест', 'мест')} успеваешь за {formatBudget(minutes)}
           </span>
         </div>
+
+        {customCount > 0 && (
+          <button
+            type="button"
+            className="banner drop"
+            style={{ position: 'absolute', right: 16, top: 80, animationDelay: '90ms', cursor: 'pointer', color: 'var(--accent-text)', fontWeight: 650 }}
+            onClick={onOpenCustom}
+          >
+            <Icon name="route" size={18} />
+            Мой маршрут · {customCount}
+          </button>
+        )}
 
         {!chainMode && (
           <div className="legend drop" style={{ position: 'absolute', left: 16, top: 124, animationDelay: '140ms' }}>
@@ -271,6 +295,8 @@ export default function ResultsScreen({
                 onSelect={onSelect}
                 onOpenPlace={onOpenPlace}
                 onRoute={onRoute}
+                inChain={inChain}
+                onToggleChain={onToggleChain}
               />
             )}
           </div>

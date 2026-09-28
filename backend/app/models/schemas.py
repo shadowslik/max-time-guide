@@ -41,6 +41,8 @@ class PlaceOut(BaseModel):
     walkTo: int
     walkBack: int
     distance: str
+    rating: Optional[float] = None
+    reviewCount: Optional[int] = None
     eval: PlaceEval
 
 

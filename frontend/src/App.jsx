@@ -10,6 +10,7 @@ import LoadingScreen from './screens/LoadingScreen.jsx';
 import ResultsScreen from './screens/ResultsScreen.jsx';
 import PlaceScreen from './screens/PlaceScreen.jsx';
 import RouteScreen from './screens/RouteScreen.jsx';
+import CustomChainScreen from './screens/CustomChainScreen.jsx';
 import NoFitScreen from './screens/NoFitScreen.jsx';
 import EditSheet from './screens/EditSheet.jsx';
 import HistoryScreen from './screens/HistoryScreen.jsx';
@@ -41,6 +42,18 @@ export default function App() {
   const [mode, setMode] = useState('single');
   const [startAt, setStartAt] = useState(() => new Date());
   const [history, setHistory] = useState(HISTORY);
+  // «Мой маршрут» — места, которые пользователь сам собрал в цепочку.
+  const [customChain, setCustomChain] = useState([]);
+
+  const inChain = useCallback((id) => customChain.some((p) => p.id === id), [customChain]);
+  const toggleChain = useCallback((place) => {
+    setCustomChain((list) =>
+      list.some((p) => p.id === place.id) ? list.filter((p) => p.id !== place.id) : [...list, place],
+    );
+  }, []);
+  const removeFromChain = useCallback((id) => {
+    setCustomChain((list) => list.filter((p) => p.id !== id));
+  }, []);
 
   const screen = stack[stack.length - 1];
 
@@ -244,6 +257,11 @@ export default function App() {
             startAt={startAt}
             onSelect={setSelectedId}
             onOpenPlace={() => go('place')}
+            onMarkerOpen={(id) => { setSelectedId(id); go('place'); }}
+            customCount={customChain.length}
+            inChain={inChain}
+            onToggleChain={toggleChain}
+            onOpenCustom={() => go('custom')}
             onRoute={() => selected && openRoute(selected)}
             onEdit={() => setSheet('edit')}
             onMode={setMode}
@@ -257,6 +275,8 @@ export default function App() {
             place={selected}
             minutes={minutes}
             chain={chain}
+            inMyChain={selected ? inChain(selected.id) : false}
+            onToggleMyChain={() => selected && toggleChain(selected)}
             onBack={back}
             onRoute={() => openRoute(selected)}
             onChain={() => {
@@ -276,6 +296,19 @@ export default function App() {
             startAt={startAt}
             onBack={back}
             onEdit={() => setSheet('edit')}
+          />
+        );
+
+      case 'custom':
+        return (
+          <CustomChainScreen
+            theme={scheme}
+            start={start}
+            minutes={minutes}
+            startAt={startAt}
+            chain={customChain}
+            onRemove={removeFromChain}
+            onBack={back}
           />
         );
 

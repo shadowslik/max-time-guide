@@ -269,7 +269,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                 "page_size": min(per_query, 10),  # 2ГИС: допустимо 1..10
                 # branch — организации (музеи/кафе/театры), attraction — парки/памятники/смотровые
                 "type": "branch,attraction",
-                "fields": "items.point,items.address_name,items.full_name,items.rubrics",
+                "fields": "items.point,items.address_name,items.full_name,items.rubrics,items.reviews",
                 "key": TWOGIS_KEY,
             }
             try:
@@ -295,6 +295,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                     continue
                 ideal, mn = _visit_time_by_interests(q_ints)
                 rubric = next((rb.get("name") for rb in (it.get("rubrics") or []) if rb.get("name")), "")
+                reviews = it.get("reviews") or {}
                 rec = {
                     "id": f"2gis/{oid}",
                     "name": name,
@@ -308,6 +309,8 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                     "coords": [float(plon), float(plat)],
                     "idealVisit": ideal,
                     "minVisit": mn,
+                    "rating": reviews.get("general_rating"),
+                    "reviewCount": reviews.get("general_review_count"),
                 }
                 by_id[oid] = rec
                 out.append(rec)

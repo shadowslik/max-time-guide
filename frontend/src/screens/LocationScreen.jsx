@@ -42,7 +42,10 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
   }, [coords, onPicked]);
 
   const current = onPicked ? label : here;
-  const place = current?.title || CITY.name;
+  // Показываем и место, и город: «улица · город» либо «город · регион».
+  const place = current
+    ? [current.title, current.subtitle].filter(Boolean).join(' · ')
+    : CITY.name;
   // Выбранный адрес показываем крупно (метка на доме), свободный поиск — обзорно.
   const zoom = label ? 17 : 15;
 
