@@ -243,7 +243,7 @@ def _visit_time_by_interests(ints) -> tuple:
     return 30, 15
 
 
-def fetch_2gis_places(start, interests, minutes=120, per_query=12, limit=80) -> Optional[List[dict]]:
+def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> Optional[List[dict]]:
     """Места из 2ГИС по категориям и радиусу (основной источник). None — ключ не задан."""
     if not TWOGIS_KEY:
         return None
@@ -266,7 +266,9 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=12, limit=80) -> 
             params = {
                 "q": q, "point": point, "radius": radius_m,
                 "sort": "distance", "sort_point": point,
-                "page_size": per_query, "type": "branch",
+                "page_size": min(per_query, 10),  # 2ГИС: допустимо 1..10
+                # branch — организации (музеи/кафе/театры), attraction — парки/памятники/смотровые
+                "type": "branch,attraction",
                 "fields": "items.point,items.address_name,items.full_name,items.rubrics",
                 "key": TWOGIS_KEY,
             }
