@@ -1,14 +1,10 @@
-# Домен через sslip.io — автоматически указывает на IP сервера, покупать ничего не нужно.
-# Формат: <IP-сервера>.sslip.io
 168.113.157.47.sslip.io {
     encode gzip
 
-    # Бэкенд-API: путь /api/* уходит на сервис backend (FastAPI на 8000).
     handle /api/* {
         reverse_proxy backend:8000
     }
 
-    # Всё остальное — мини-приложение (React через nginx).
     handle {
         reverse_proxy frontend:80
     }

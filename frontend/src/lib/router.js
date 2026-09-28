@@ -37,8 +37,20 @@ export async function fetchRouteDetails(points) {
 // Ссылка на пеший маршрут во внешних картах — для кнопки «Открыть маршрут».
 // OpenStreetMap умеет строить маршрут по ссылке и не требует ключа.
 export function externalRouteUrl(points) {
-  const [fromLon, fromLat] = points[0];
-  const [toLon, toLat] = points[points.length - 1];
+  let pts = points;
+  // Круговой маршрут заканчивается в точке старта. Для внешней ссылки это значит
+  // from == to, и маршрут не строится — поэтому возврат в старт отбрасываем.
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  if (
+    pts.length > 2 &&
+    first && last &&
+    first[0] === last[0] && first[1] === last[1]
+  ) {
+    pts = pts.slice(0, -1);
+  }
+  const [fromLon, fromLat] = pts[0];
+  const [toLon, toLat] = pts[pts.length - 1];
   return (
     'https://www.openstreetmap.org/directions?engine=fossgis_osrm_foot' +
     `&route=${fromLat}%2C${fromLon}%3B${toLat}%2C${toLon}`

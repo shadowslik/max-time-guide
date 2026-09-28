@@ -189,7 +189,11 @@ export default function ResultsScreen({
         title: leg.place.name,
         label: leg.place.short,
       }))
-    : results.map((place) => {
+    : results
+        // На карте показываем только места с рейтингом от 4★ (без рейтинга —
+        // оставляем, оценить их нельзя; выбранное место видно всегда).
+        .filter((place) => place.id === selected?.id || place.rating == null || place.rating >= 4)
+        .map((place) => {
         const active = place.id === selected?.id;
         return {
           id: place.id,
