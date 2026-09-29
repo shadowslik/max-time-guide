@@ -286,13 +286,14 @@ for _off, _codes in {
 _tz_cache: dict = {}
 
 
-def _region_offset(start) -> int:
-    """Смещение UTC (часы) по региону точки старта. По умолчанию +3 (МСК)."""
-    key = (round(start[0], 1), round(start[1], 1))  # ~региональная сетка
+def _region_info(start) -> dict:
+    """По координатам старта: смещение UTC региона и название города. Один запрос
+    к DaData, результат кэшируется по региональной сетке. Дефолт — МСК/Казань."""
+    key = (round(start[0], 1), round(start[1], 1))
     if key in _tz_cache:
         return _tz_cache[key]
 
-    offset = 3
+    info = {"offset": 3, "city": None}
     if DADATA_TOKEN:
         try:
             headers = {
@@ -306,13 +307,28 @@ def _region_offset(start) -> int:
                 if r.status_code == 200:
                     sug = r.json().get("suggestions") or []
                     if sug:
-                        iso = (sug[0].get("data") or {}).get("region_iso_code")
-                        offset = _RU_TZ_BY_ISO.get(iso, 3)
+                        d = sug[0].get("data") or {}
+                        info["offset"] = _RU_TZ_BY_ISO.get(d.get("region_iso_code"), 3)
+                        info["city"] = (
+                            d.get("city_with_type")
+                            or d.get("settlement_with_type")
+                            or d.get("region_with_type")
+                        )
         except Exception as e:  # noqa: BLE001
-            log.warning("tz lookup fail: %s", e)
+            log.warning("region lookup fail: %s", e)
 
-    _tz_cache[key] = offset
-    return offset
+    _tz_cache[key] = info
+    return info
+
+
+def _region_offset(start) -> int:
+    """Смещение UTC (часы) по региону точки старта. По умолчанию +3 (МСК)."""
+    return _region_info(start)["offset"]
+
+
+def region_city(start) -> Optional[str]:
+    """Город точки старта (для подписи маршрутов в профиле)."""
+    return _region_info(start)["city"]
 
 
 def _now_local(offset: int = 3) -> datetime:

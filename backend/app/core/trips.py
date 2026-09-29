@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from backend.app.core import db
 from backend.app.data.places import CITY_NAME, PLACES
+from backend.app.data.sources import region_city
 from backend.app.models.schemas import ProfileStats, TripCreate, TripOut
 
 
@@ -61,9 +62,17 @@ def create_trip(user_id: str, body: TripCreate, place_name: Optional[str] = None
         if same:
             return _row_to_trip(same[0])
 
+    # Город — по точке старта маршрута (а не всегда «Казань»).
+    city = CITY_NAME
+    if body.start:
+        try:
+            city = region_city(body.start) or CITY_NAME
+        except Exception:  # noqa: BLE001
+            city = CITY_NAME
+
     trip = TripOut(
         id=f"trip-{body.placeId or 'x'}-{today}-{uuid4().hex[:6]}",
-        city=CITY_NAME,
+        city=city,
         place=place_name or _place_name(body.placeId),
         placeId=body.placeId,
         date=today,
