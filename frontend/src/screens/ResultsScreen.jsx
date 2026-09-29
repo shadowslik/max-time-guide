@@ -196,7 +196,7 @@ export default function ResultsScreen({
         route={routeMode ? routeLine : undefined}
         fit={routeMode ? (plan.points) : [start, selected?.coords]}
         bottomInset={300}
-        onSelect={routeMode ? undefined : (onMarkerOpen ?? onSelect)}
+        onSelect={onMarkerOpen ?? onSelect}
       >
         <div className="params drop" style={{ position: 'absolute', left: 16, right: 16, top: 16 }}>
           <button type="button" className="icon-button" style={{ width: 40, height: 40, borderRadius: 12, flexShrink: 0 }} aria-label="Назад" onClick={onBack}>

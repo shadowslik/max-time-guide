@@ -117,6 +117,8 @@ export default function PlaceScreen({ place, minutes, chain, inMyChain, onToggle
           <Icon name={inMyChain ? 'check' : 'route'} size={20} />
           {inMyChain ? 'В моём маршруте' : 'В мой маршрут'}
         </Button>
+        {/* Запас прокрутки снизу, чтобы кнопки не липли к краю экрана. */}
+        <div style={{ height: 28, flexShrink: 0 }} />
       </Sheet>
     </div>
   );
