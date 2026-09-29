@@ -18,6 +18,7 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 
 import { CITY, HISTORY } from './data/places.js';
 import { rankPlaces } from './lib/planner.js';
+import { formatDistance, walkMinutes } from './lib/geo.js';
 import { fetchProfile, regionNow, saveTripRemote, searchRemote } from './lib/api.js';
 import { detectColorScheme, getUser, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
 import { formatDate } from './lib/format.js';
@@ -38,6 +39,9 @@ export default function App() {
   const [chains, setChains] = useState([]); // варианты цепочек под выбранные интересы
   const [searchReady, setSearchReady] = useState(true);
   const [selectedId, setSelectedId] = useState(null);
+  // Место для экрана маршрута, собранное из сохранённой поездки (история/профиль):
+  // его нет в результатах подбора, поэтому храним отдельно.
+  const [routePlace, setRoutePlace] = useState(null);
   const [start, setStart] = useState(CITY.start);
   // Подпись выбранного адреса (улица/дом) — чтобы на карте показывать её, а не город.
   const [startLabel, setStartLabel] = useState(null);
@@ -167,11 +171,14 @@ export default function App() {
           visit: place.eval.visit,
           walkBack: place.walkBack,
           interests: place.interests,
+          start,
+          coords: place.coords,
         },
         ...list,
       ];
     });
-    // Пишем в БД (история профиля). Имя места передаём явно — для мест 2ГИС.
+    // Пишем в БД (история профиля). Имя и координаты места передаём явно —
+    // координаты нужны, чтобы позже построить маршрут из истории.
     saveTripRemote({
       placeId: place.id,
       place: place.name,
@@ -181,11 +188,13 @@ export default function App() {
       walkBack: place.walkBack,
       interests: place.interests,
       start,
+      coords: place.coords,
     });
   }, [start]);
 
   const openRoute = useCallback(
     (place) => {
+      setRoutePlace(null); // обычный маршрут строится по месту из результатов
       setSelectedId(place.id);
       saveTrip(place);
       go('route');
@@ -226,6 +235,49 @@ export default function App() {
         .finally(() => setSearchReady(true));
     },
     [interests, start, minutes, replace],
+  );
+
+  // Открыть сохранённую поездку из истории/профиля: просто строим маршрут
+  // «от точки, где был → до места» на экране RouteScreen, без подбора и без
+  // заголовка «сколько мест успеваю». Если координат нет (старая запись) —
+  // откатываемся на повторный подбор.
+  const openSavedTrip = useCallback(
+    (trip) => {
+      const coords = trip?.coords;
+      const from = trip?.start ?? start;
+      if (!coords || coords.length !== 2) {
+        repeatTrip(trip);
+        return;
+      }
+      const walkTo = trip.walkTo || walkMinutes(from, coords);
+      const walkBack = trip.walkBack || walkMinutes(coords, from);
+      const visit = trip.visit || 30;
+      const road = walkTo + walkBack;
+      const budget = Math.min(240, Math.max(15, trip.minutes || road + visit));
+      const place = {
+        id: trip.placeId || trip.id,
+        name: trip.place,
+        coords,
+        walkTo,
+        walkBack,
+        distance: formatDistance(from, coords),
+        eval: {
+          status: 'fits',
+          visit,
+          buffer: Math.max(0, budget - road - visit),
+          road,
+          total: road + visit,
+        },
+      };
+      setStart(from);
+      setMinutes(budget);
+      setStartAt(new Date());
+      setMode('single');
+      setRoutePlace(place);
+      setSheet(null);
+      replace('location', 'route');
+    },
+    [start, replace, repeatTrip],
   );
 
   const fitsCount = results.filter((p) => p.eval.status !== 'no').length;
@@ -324,7 +376,7 @@ export default function App() {
           <RouteScreen
             theme={scheme}
             start={start}
-            place={selected}
+            place={routePlace ?? selected}
             minutes={minutes}
             startAt={startAt}
             onBack={back}
@@ -376,8 +428,8 @@ export default function App() {
           <HistoryScreen
             history={history}
             onBack={back}
-            onRepeat={repeatTrip}
-            onOpen={repeatTrip}
+            onRepeat={openSavedTrip}
+            onOpen={openSavedTrip}
           />
         );
 
@@ -387,7 +439,7 @@ export default function App() {
             profile={profile}
             user={user}
             onBack={back}
-            onOpen={repeatTrip}
+            onOpen={openSavedTrip}
           />
         );
 

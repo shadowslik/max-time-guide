@@ -5,7 +5,7 @@
 import Icon from './Icon.jsx';
 import Timeline from './Timeline.jsx';
 import { Badge, Button } from './ui.jsx';
-import { addMinutes, clock } from '../lib/format.js';
+import { addMinutes, clock, plural } from '../lib/format.js';
 import { walkMinutes } from '../lib/geo.js';
 
 const visitOf = (place) => place.eval?.visit ?? place.idealVisit ?? 30;
@@ -76,7 +76,9 @@ export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild
     <>
       <div className="row mt-4">
         <h2 className="title-m grow">
-          {plan.fits ? `Успеешь всё за ${minutes} мин` : 'Не помещается в бюджет'}
+          {plan.fits
+            ? `Успеешь ${places.length} ${plural(places.length, 'место', 'места', 'мест')} за ${minutes} мин`
+            : 'Не помещается в бюджет'}
         </h2>
         <Badge tone={plan.fits ? 'ok' : 'warn'}>
           {plan.fits ? `запас ${minutes - plan.total} мин` : `не хватает ${plan.over} мин`}

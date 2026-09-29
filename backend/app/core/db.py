@@ -42,6 +42,14 @@ def _connect() -> sqlite3.Connection:
         """
     )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_trips_user ON trips(user_id, created_at)")
+
+    # Миграция: старые базы не знают про координаты места и точку старта.
+    # Они нужны, чтобы из истории строить маршрут «от точки где я был → до места».
+    have = {row["name"] for row in conn.execute("PRAGMA table_info(trips)")}
+    for col in ("place_lon", "place_lat", "start_lon", "start_lat"):
+        if col not in have:
+            conn.execute(f"ALTER TABLE trips ADD COLUMN {col} REAL")
+
     conn.commit()
     return conn
 

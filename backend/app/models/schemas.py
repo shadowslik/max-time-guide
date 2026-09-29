@@ -113,6 +113,7 @@ class TripCreate(BaseModel):
     walkBack: int
     interests: List[str] = Field(default_factory=list)
     start: Optional[List[float]] = None
+    coords: Optional[List[float]] = None  # координаты места [lon, lat] — чтобы повторить маршрут
 
 
 class TripOut(BaseModel):
@@ -126,6 +127,8 @@ class TripOut(BaseModel):
     visit: int
     walkBack: int
     interests: List[str]
+    start: Optional[List[float]] = None   # точка старта той поездки [lon, lat]
+    coords: Optional[List[float]] = None  # координаты места [lon, lat]
 
 
 class TripsResponse(BaseModel):

@@ -23,6 +23,21 @@ def _place_name(place_id: Optional[str]) -> str:
     return place_id
 
 
+def _coords(lon, lat) -> Optional[list]:
+    """Пара колонок lon/lat → [lon, lat] или None, если координат нет."""
+    if lon is None or lat is None:
+        return None
+    return [lon, lat]
+
+
+def _col(r, name):
+    """Безопасно достаём колонку: у старых строк её может не быть в выборке."""
+    try:
+        return r[name]
+    except (IndexError, KeyError):
+        return None
+
+
 def _row_to_trip(r) -> TripOut:
     try:
         interests = json.loads(r["interests"] or "[]")
@@ -39,6 +54,8 @@ def _row_to_trip(r) -> TripOut:
         visit=r["visit"] or 0,
         walkBack=r["walk_back"] or 0,
         interests=interests,
+        start=_coords(_col(r, "start_lon"), _col(r, "start_lat")),
+        coords=_coords(_col(r, "place_lon"), _col(r, "place_lat")),
     )
 
 
@@ -70,6 +87,9 @@ def create_trip(user_id: str, body: TripCreate, place_name: Optional[str] = None
         except Exception:  # noqa: BLE001
             city = CITY_NAME
 
+    start = body.start if (body.start and len(body.start) == 2) else None
+    coords = body.coords if (body.coords and len(body.coords) == 2) else None
+
     trip = TripOut(
         id=f"trip-{body.placeId or 'x'}-{today}-{uuid4().hex[:6]}",
         city=city,
@@ -81,17 +101,22 @@ def create_trip(user_id: str, body: TripCreate, place_name: Optional[str] = None
         visit=body.visit,
         walkBack=body.walkBack,
         interests=list(body.interests),
+        start=start,
+        coords=coords,
     )
     db.execute(
         """
         INSERT INTO trips (id, user_id, place, place_id, city, date, minutes, walk_to,
-                           visit, walk_back, interests, created_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                           visit, walk_back, interests, created_at,
+                           start_lon, start_lat, place_lon, place_lat)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             trip.id, user_id, trip.place, trip.placeId, trip.city, trip.date, trip.minutes,
             trip.walkTo, trip.visit, trip.walkBack, json.dumps(trip.interests, ensure_ascii=False),
             datetime.now(timezone.utc).isoformat(),
+            start[0] if start else None, start[1] if start else None,
+            coords[0] if coords else None, coords[1] if coords else None,
         ),
     )
     return trip
