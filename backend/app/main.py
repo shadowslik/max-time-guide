@@ -20,7 +20,7 @@ log = logging.getLogger("main")
 
 async def _run_api():
     server = uvicorn.Server(
-        uvicorn.Config(app, host="0.0.0.0", port=8000, log_level="info")
+        uvicorn.Config(app, host="0.0.0.0", port=config.API_PORT, log_level="info")
     )
     await server.serve()
 
@@ -35,7 +35,13 @@ async def _run_bot():
 
 
 async def main():
-    await asyncio.gather(_run_api(), _run_bot())
+    # Локально бота можно не поднимать (RUN_BOT=0) или он выключен из-за пустого
+    # токена — тогда крутим только API, чтобы не конкурировать с ботом на сервере.
+    if config.RUN_BOT and config.TOKEN:
+        await asyncio.gather(_run_api(), _run_bot())
+    else:
+        log.info("Бот выключен (RUN_BOT=0 или нет токена) — поднимаю только API на :%s", config.API_PORT)
+        await _run_api()
 
 
 if __name__ == "__main__":

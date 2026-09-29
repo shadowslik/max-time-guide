@@ -9,3 +9,18 @@
         reverse_proxy frontend:80
     }
 }
+
+# Локальный запуск тем же `docker compose up`: открывать http://localhost
+# (по HTTP, без сертификатов). Тот же роутинг, что и на сервере: /api → бэкенд,
+# остальное → статика фронта. На боевом сервере этот блок безвреден.
+http://localhost, http://127.0.0.1 {
+    encode gzip
+
+    handle /api/* {
+        reverse_proxy backend:8000
+    }
+
+    handle {
+        reverse_proxy frontend:80
+    }
+}
