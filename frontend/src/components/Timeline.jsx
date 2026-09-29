@@ -31,10 +31,27 @@ export default function Timeline({ items }) {
             <div className="timeline__rail" style={{ paddingTop: item.type === 'stop' ? 1 : 2 }}>
               <Mark item={item} />
             </div>
-            <div className="grow">
-              <div className="timeline__title">{item.title}</div>
-              <div className={`timeline__sub${item.tone === 'ok' ? ' timeline__sub--ok' : ''}`}>{item.sub}</div>
-            </div>
+            {item.onOpen ? (
+              <button
+                type="button"
+                className="grow"
+                style={{ border: 0, background: 'none', padding: 0, textAlign: 'left', color: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
+                onClick={item.onOpen}
+              >
+                <span className="grow">
+                  <div className="timeline__title">{item.title}</div>
+                  <div className={`timeline__sub${item.tone === 'ok' ? ' timeline__sub--ok' : ''}`}>{item.sub}</div>
+                </span>
+                <span style={{ flexShrink: 0, color: 'var(--chevron)', display: 'flex' }}>
+                  <Icon name="chevronRight" size={16} />
+                </span>
+              </button>
+            ) : (
+              <div className="grow">
+                <div className="timeline__title">{item.title}</div>
+                <div className={`timeline__sub${item.tone === 'ok' ? ' timeline__sub--ok' : ''}`}>{item.sub}</div>
+              </div>
+            )}
             {item.onRemove && (
               <button
                 type="button"

@@ -302,6 +302,7 @@ export default function ResultsScreen({
                 built={built}
                 onBuild={buildRoute}
                 onRemove={removeFromActive}
+                onOpenPlace={onMarkerOpen ?? onSelect}
                 onOpen={() => openExternal(externalRouteUrl(plan.points))}
                 emptyHint={
                   mode === 'my'

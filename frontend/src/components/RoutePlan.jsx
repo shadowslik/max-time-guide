@@ -60,14 +60,16 @@ export function computeRoutePlan(places, start, minutes, startAt) {
 
 // Панель одной вкладки-маршрута: заголовок, таймлайн (с удалением) во всю высоту
 // и «липкие» кнопки снизу. «Построить маршрут» — строит и сохраняет по нажатию.
-export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild, onOpen, emptyHint }) {
+export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild, onOpen, onOpenPlace, emptyHint }) {
   if (!places.length) {
     return <p className="lead" style={{ marginTop: 14 }}>{emptyHint}</p>;
   }
 
-  // Пробрасываем в таймлайн кнопку удаления для каждой остановки.
+  // В остановки пробрасываем удаление (×) и открытие карточки места (тап по строке).
   const items = plan.timeline.map((it) =>
-    it.type === 'stop' && it.placeId ? { ...it, onRemove: () => onRemove(it.placeId) } : it,
+    it.type === 'stop' && it.placeId
+      ? { ...it, onRemove: () => onRemove(it.placeId), onOpen: onOpenPlace ? () => onOpenPlace(it.placeId) : undefined }
+      : it,
   );
 
   return (
