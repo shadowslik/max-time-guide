@@ -4,6 +4,7 @@ import Icon from '../components/Icon.jsx';
 import { Screen, SectionLabel, TopBar } from '../components/ui.jsx';
 import { INTERESTS } from '../data/places.js';
 import { formatDuration, interestsLabel, plural } from '../lib/format.js';
+import { debugInfo } from '../lib/maxBridge.js';
 
 function Avatar({ src, name, size = 72 }) {
   const letter = (name || 'Г').trim().charAt(0).toUpperCase();
@@ -102,6 +103,18 @@ export default function ProfileScreen({ profile, user, onBack, onOpen }) {
           ))}
         </div>
       )}
+
+      {/* Временная диагностика MAX — по ней настроим имя/аватар, потом уберём. */}
+      <SectionLabel className="mt-24">Диагностика (временно)</SectionLabel>
+      <pre
+        style={{
+          marginTop: 8, padding: 12, borderRadius: 12, background: 'var(--surface-2)',
+          color: 'var(--text-2)', fontSize: 11, lineHeight: 1.4, whiteSpace: 'pre-wrap',
+          wordBreak: 'break-all', overflowX: 'auto',
+        }}
+      >
+        {JSON.stringify(debugInfo(), null, 2)}
+      </pre>
 
       <div className="spacer" style={{ minHeight: 16 }} />
     </Screen>

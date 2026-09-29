@@ -99,6 +99,30 @@ export function getUser() {
   return { name, avatar };
 }
 
+// Временная диагностика: что реально доступно в webview MAX (глобалы, initData).
+// По ней подхватим правильные поля пользователя. Убрать после настройки.
+export function debugInfo() {
+  const out = {};
+  try {
+    out.href = window.location.href;
+    out.globals = Object.keys(window).filter((k) => /web|max|tg|telegram|bridge|app|vk/i.test(k)).slice(0, 40);
+    for (const g of ['WebApp', 'max', 'maxApp', 'Max', 'MAX', 'Telegram', 'vkBridge', 'bridge']) {
+      const o = window[g];
+      if (o && typeof o === 'object') {
+        out[g] = Object.keys(o).slice(0, 40);
+        if (o.initDataUnsafe && typeof o.initDataUnsafe === 'object') {
+          out[g + '.initDataUnsafe'] = Object.keys(o.initDataUnsafe);
+        }
+      }
+    }
+    out.initData = String(getInitData()).slice(0, 160);
+    out.user = getUser();
+  } catch (e) {
+    out.error = String(e);
+  }
+  return out;
+}
+
 // Сообщаем MAX, что приложение готово и хочет занять весь экран.
 export function notifyReady() {
   const api = bridge();
