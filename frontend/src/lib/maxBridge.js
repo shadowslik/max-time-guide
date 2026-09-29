@@ -46,7 +46,8 @@ function initDataFromUrl() {
     for (const raw of parts) {
       if (!raw) continue;
       const p = new URLSearchParams(raw);
-      for (const key of ['initData', 'tgWebAppData', 'webAppData', 'web_app_data', 'max_web_app_data']) {
+      // MAX кладёт initData в хэш под ключом WebAppData (регистр важен!).
+      for (const key of ['WebAppData', 'initData', 'tgWebAppData', 'webAppData', 'web_app_data']) {
         const v = p.get(key);
         if (v) return v;
       }
