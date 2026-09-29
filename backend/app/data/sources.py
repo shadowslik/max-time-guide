@@ -17,7 +17,7 @@ from typing import List, Optional
 
 import httpx
 
-from backend.app.config import CULTURE_API_KEY, TWOGIS_KEY
+from backend.app.config import CULTURE_API_KEY, DADATA_TOKEN, TWOGIS_KEY
 from backend.app.data.places import PLACES  # запасной каталог — только рядом с Казанью
 
 log = logging.getLogger(__name__)
@@ -256,9 +256,68 @@ def _hm(s: str) -> Optional[int]:
         return None
 
 
-def _now_local() -> datetime:
-    # Контейнер обычно в UTC; берём московское время (+3) как разумный дефолт для РФ.
-    return datetime.utcnow() + timedelta(hours=3)
+DADATA_GEOLOCATE_URL = "https://suggestions.dadata.ru/suggestions/api/4_1/rs/geolocate/address"
+
+# Часовой пояс определяется РЕГИОНОМ, а не долготой (Казань RU-TA +3, но западнее
+# Саратов RU-SAR +4). Смещение UTC по коду субъекта РФ (ISO 3166-2). Без перехода
+# на летнее время. Регионы с несколькими зонами — берём столичное смещение.
+_RU_TZ_BY_ISO = {}
+for _off, _codes in {
+    2: ["RU-KGD"],
+    3: ["RU-MOW", "RU-MOS", "RU-SPE", "RU-LEN", "RU-AD", "RU-BEL", "RU-BRY", "RU-VLA",
+        "RU-VGG", "RU-VLG", "RU-VOR", "RU-IVA", "RU-TVE", "RU-KLU", "RU-KOS", "RU-KDA",
+        "RU-KRS", "RU-LIP", "RU-ORL", "RU-PNZ", "RU-PSK", "RU-ROS", "RU-RYA", "RU-SMO",
+        "RU-TAM", "RU-TUL", "RU-YAR", "RU-NGR", "RU-MUR", "RU-ARK", "RU-NEN", "RU-KL",
+        "RU-KB", "RU-KC", "RU-SE", "RU-IN", "RU-CE", "RU-DA", "RU-STA", "RU-KR", "RU-KO",
+        "RU-ME", "RU-MO", "RU-CU", "RU-TA", "RU-NIZ", "RU-KIR", "RU-CR", "RU-SEV"],
+    4: ["RU-SAM", "RU-SAR", "RU-UD", "RU-AST", "RU-ULY"],
+    5: ["RU-SVE", "RU-PER", "RU-BA", "RU-CHE", "RU-KGN", "RU-ORE", "RU-KHM", "RU-YAN", "RU-TYU"],
+    6: ["RU-OMS"],
+    7: ["RU-NVS", "RU-TOM", "RU-KEM", "RU-ALT", "RU-AL", "RU-KYA", "RU-KK", "RU-TY"],
+    8: ["RU-IRK", "RU-BU"],
+    9: ["RU-ZAB", "RU-AMU", "RU-SA"],
+    10: ["RU-PRI", "RU-KHA", "RU-YEV"],
+    11: ["RU-MAG", "RU-SAK"],
+    12: ["RU-KAM", "RU-CHU"],
+}.items():
+    for _c in _codes:
+        _RU_TZ_BY_ISO[_c] = _off
+
+_tz_cache: dict = {}
+
+
+def _region_offset(start) -> int:
+    """Смещение UTC (часы) по региону точки старта. По умолчанию +3 (МСК)."""
+    key = (round(start[0], 1), round(start[1], 1))  # ~региональная сетка
+    if key in _tz_cache:
+        return _tz_cache[key]
+
+    offset = 3
+    if DADATA_TOKEN:
+        try:
+            headers = {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "Authorization": f"Token {DADATA_TOKEN}",
+            }
+            body = {"lat": start[1], "lon": start[0], "count": 1}
+            with httpx.Client(timeout=8.0) as client:
+                r = client.post(DADATA_GEOLOCATE_URL, headers=headers, json=body)
+                if r.status_code == 200:
+                    sug = r.json().get("suggestions") or []
+                    if sug:
+                        iso = (sug[0].get("data") or {}).get("region_iso_code")
+                        offset = _RU_TZ_BY_ISO.get(iso, 3)
+        except Exception as e:  # noqa: BLE001
+            log.warning("tz lookup fail: %s", e)
+
+    _tz_cache[key] = offset
+    return offset
+
+
+def _now_local(offset: int = 3) -> datetime:
+    # Контейнер обычно в UTC; прибавляем смещение региона старта.
+    return datetime.utcnow() + timedelta(hours=offset)
 
 
 def _is_open(schedule: dict, when: datetime) -> Optional[bool]:
@@ -326,7 +385,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
     """
     if not TWOGIS_KEY:
         return None
-    now = _now_local()
+    now = _now_local(_region_offset(start))  # местное время региона точки старта
 
     ids = [i for i in (interests or []) if i in TWOGIS_QUERIES] or list(TWOGIS_QUERIES)
     # Запрос → интересы, которые его породили (музей относится к art и culture).
