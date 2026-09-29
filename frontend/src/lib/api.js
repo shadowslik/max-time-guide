@@ -69,5 +69,12 @@ export async function searchRemote(minutes, interestIds, from) {
   const chains = (data.chains ?? (data.chain ? [data.chain] : []))
     .map(toChain)
     .filter(Boolean);
-  return { places, chain: chains[0] ?? null, chains };
+  return { places, chain: chains[0] ?? null, chains, tzOffset: data.tzOffset ?? 3 };
+}
+
+// Дата, показывающая ЛОКАЛЬНОЕ время региона (по смещению UTC) в getHours/getMinutes,
+// какой бы ни была таймзона устройства. Нужна для «времени старта» по выбранному городу.
+export function regionNow(tzOffset = 3) {
+  const dev = new Date();
+  return new Date(dev.getTime() + tzOffset * 3600000 + dev.getTimezoneOffset() * 60000);
 }

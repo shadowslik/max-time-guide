@@ -66,6 +66,7 @@ class SearchResponse(BaseModel):
     places: List[PlaceOut]
     chain: Optional[ChainOut] = None            # лучший вариант (для совместимости)
     chains: List[ChainOut] = Field(default_factory=list)  # варианты цепочек на выбор
+    tzOffset: int = 3                           # смещение UTC региона старта (для местного времени)
 
 
 class RouteRequest(BaseModel):

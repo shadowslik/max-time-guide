@@ -7,7 +7,7 @@ import math
 from datetime import datetime, timezone
 from typing import List, Optional, Sequence, Tuple
 
-from backend.app.data.sources import fetch_places
+from backend.app.data.sources import fetch_places, _region_offset
 from backend.app.models.schemas import (
     ChainLeg,
     ChainOut,
@@ -137,6 +137,7 @@ def search_places(req: SearchRequest) -> SearchResponse:
         places=evaluated,
         chain=chains[0] if chains else None,
         chains=chains,
+        tzOffset=_region_offset(start),  # кэшируется — второго запроса к DaData не будет
     )
 
 

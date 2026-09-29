@@ -18,7 +18,7 @@ import HistoryScreen from './screens/HistoryScreen.jsx';
 
 import { CITY, HISTORY } from './data/places.js';
 import { rankPlaces } from './lib/planner.js';
-import { fetchProfile, saveTripRemote, searchRemote } from './lib/api.js';
+import { fetchProfile, regionNow, saveTripRemote, searchRemote } from './lib/api.js';
 import { detectColorScheme, getUser, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
 import { formatDate } from './lib/format.js';
 
@@ -125,10 +125,11 @@ export default function App() {
       });
 
       searchRemote(nextMinutes, nextInterests, start)
-        .then(({ places, chain: nextChain, chains: nextChains }) => {
+        .then(({ places, chain: nextChain, chains: nextChains, tzOffset }) => {
           setResults(places);
           setChain(nextChain);
           setChains(nextChains ?? []);
+          setStartAt(regionNow(tzOffset)); // время старта — по региону выбранного места
           setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
         })
         .catch(() => {
@@ -209,10 +210,11 @@ export default function App() {
       replace('location', 'results', 'loading');
 
       searchRemote(nextMinutes, nextInterests, start)
-        .then(({ places, chain: nextChain, chains: nextChains }) => {
+        .then(({ places, chain: nextChain, chains: nextChains, tzOffset }) => {
           setResults(places);
           setChain(nextChain);
           setChains(nextChains ?? []);
+          setStartAt(regionNow(tzOffset)); // время старта — по региону выбранного места
           setSelectedId(places.find((p) => p.eval.status !== 'no')?.id ?? places[0]?.id ?? null);
         })
         .catch(() => {
