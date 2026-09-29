@@ -9,7 +9,7 @@ import { hasGeocoder, reverseGeocode } from '../lib/geocoder.js';
 // Без кнопки «Ввести адрес» шторке не нужна её высота.
 const SHEET = hasGeocoder ? 392 : 328;
 
-export default function LocationScreen({ theme, start, label, onConfirm, onAddress, onHistory }) {
+export default function LocationScreen({ theme, start, label, user, onConfirm, onAddress, onProfile }) {
   const [coords, setCoords] = useState(start ?? CITY.start);
   // Подпись места под центром карты — определяем по координатам (обратный геокод).
   const [here, setHere] = useState(null);
@@ -67,11 +67,19 @@ export default function LocationScreen({ theme, start, label, onConfirm, onAddre
         <button
           type="button"
           className="icon-button icon-button--float drop"
-          style={{ position: 'absolute', right: 16, top: 10 }}
-          onClick={onHistory}
-          aria-label="Мои маршруты"
+          style={{ position: 'absolute', right: 16, top: 10, overflow: 'hidden', padding: 0 }}
+          onClick={onProfile}
+          aria-label="Мой профиль"
         >
-          <Icon name="history" size={21} />
+          {user?.avatar ? (
+            <img src={user.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : user?.name ? (
+            <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--accent-text)' }}>
+              {user.name.trim().charAt(0).toUpperCase()}
+            </span>
+          ) : (
+            <Icon name="pin" size={20} />
+          )}
         </button>
 
         <Sheet height={SHEET}>

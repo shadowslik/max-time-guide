@@ -50,6 +50,7 @@ def open_session(init_data: str, strict: bool = False) -> Optional[SessionRespon
     user_raw = parsed.get("user")
     user_id = "max:anonymous"
     name = "Гость"
+    avatar = None
     if user_raw:
         try:
             user = json.loads(user_raw)
@@ -62,7 +63,13 @@ def open_session(init_data: str, strict: bool = False) -> Optional[SessionRespon
                 or user.get("username")
                 or name
             )
+            avatar = (
+                user.get("photo_url")
+                or user.get("avatar_url")
+                or user.get("avatar")
+                or user.get("photo")
+            )
         except json.JSONDecodeError:
             pass
 
-    return SessionResponse(userId=user_id, displayName=str(name), city=CITY_NAME)
+    return SessionResponse(userId=user_id, displayName=str(name), city=CITY_NAME, avatar=avatar)

@@ -6,7 +6,7 @@ from backend.app.core import geocode as geocode_mod
 from backend.app.core import routing as routing_mod
 from backend.app.core.planner import search_places
 from backend.app.core.session import open_session
-from backend.app.core.trips import create_trip, list_trips
+from backend.app.core.trips import create_trip, list_trips, profile_stats
 from backend.app.data.interests import INTERESTS
 from backend.app.models.schemas import (
     GeocodeResponse,
@@ -21,6 +21,7 @@ from backend.app.models.schemas import (
     TripCreate,
     TripOut,
     TripsResponse,
+    ProfileResponse,
 )
 
 router = APIRouter()
@@ -117,7 +118,25 @@ def api_trips_create(
     authorization: str | None = Header(default=None),
 ):
     uid = _user_from_auth(authorization)
-    return create_trip(uid, body)
+    return create_trip(uid, body, place_name=body.place)
+
+
+@router.get("/profile", response_model=ProfileResponse)
+def api_profile(authorization: str | None = Header(default=None)):
+    """Профиль: имя/аватар из MAX (initData) + статистика и просмотренные маршруты из БД."""
+    sess = None
+    if authorization:
+        parts = authorization.split(" ", 1)
+        if len(parts) == 2 and parts[0].lower() == "tma":
+            sess = open_session(parts[1], strict=False)
+    uid = sess.userId if sess else _user_from_auth(authorization)
+    return ProfileResponse(
+        userId=uid,
+        displayName=sess.displayName if sess else "Гость",
+        avatar=sess.avatar if sess else None,
+        stats=profile_stats(uid),
+        trips=list_trips(uid),
+    )
 
 
 @router.post("/session", response_model=SessionResponse)

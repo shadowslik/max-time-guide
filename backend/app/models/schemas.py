@@ -105,6 +105,7 @@ class InterestsResponse(BaseModel):
 
 class TripCreate(BaseModel):
     placeId: Optional[str] = None
+    place: Optional[str] = None
     minutes: int
     walkTo: int
     visit: int
@@ -138,6 +139,22 @@ class SessionResponse(BaseModel):
     userId: str
     displayName: str
     city: str
+    avatar: Optional[str] = None
+
+
+class ProfileStats(BaseModel):
+    routes: int
+    minutes: int
+    places: int
+    topInterest: Optional[str] = None
+
+
+class ProfileResponse(BaseModel):
+    userId: str
+    displayName: str
+    avatar: Optional[str] = None
+    stats: ProfileStats
+    trips: List[TripOut]
 
 
 class HealthResponse(BaseModel):

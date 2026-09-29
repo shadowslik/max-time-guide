@@ -2,6 +2,40 @@
 // прокси Vite). Ответы приводятся к тем же формам, что раньше отдавал
 // локальный планировщик, чтобы экраны не пришлось трогать.
 
+import { getInitData } from './maxBridge.js';
+
+// Заголовок авторизации MAX: бэкенд по нему определяет пользователя (профиль,
+// история). Вне MAX initData пусто — бэкенд считает гостем.
+function authHeaders() {
+  const initData = getInitData();
+  return initData ? { Authorization: `tma ${initData}` } : {};
+}
+
+// Сохранить просмотренный маршрут в БД (история профиля).
+export async function saveTripRemote(trip) {
+  try {
+    await fetch('/api/trips', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify(trip),
+    });
+  } catch (error) {
+    console.warn('[Рядом] Не удалось сохранить маршрут —', error.message);
+  }
+}
+
+// Профиль пользователя: имя/аватар из MAX + статистика и просмотренные маршруты.
+export async function fetchProfile() {
+  try {
+    const response = await fetch('/api/profile', { headers: { ...authHeaders() } });
+    if (!response.ok) throw new Error(`API ответил ${response.status}`);
+    return await response.json();
+  } catch (error) {
+    console.warn('[Рядом] Профиль не загрузился —', error.message);
+    return null;
+  }
+}
+
 // Подбор мест: POST /api/search. Возвращает { places, chain } как buildChain.
 export async function searchRemote(minutes, interestIds, from) {
   const response = await fetch('/api/search', {

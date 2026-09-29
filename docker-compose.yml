@@ -28,7 +28,11 @@ services:
     build: ./backend
     env_file: .env
     restart: unless-stopped
+    # SQLite-файл (профиль, история маршрутов) — на томе, чтобы переживал пересборку.
+    volumes:
+      - backend_data:/app/backend/data
 
 volumes:
   caddy_data:
   caddy_config:
+  backend_data:

@@ -37,6 +37,34 @@ export function onColorSchemeChange(handler) {
   return () => cleanups.forEach((fn) => fn());
 }
 
+// initData — строка авторизации MAX (для запросов к бэкенду). Вне MAX пусто.
+export function getInitData() {
+  const api = bridge();
+  try {
+    return api?.initData || '';
+  } catch {
+    return '';
+  }
+}
+
+// Данные пользователя MAX: имя и аватар. Разные версии кладут их по-разному,
+// поэтому проверяем несколько путей; вне MAX — null.
+export function getUser() {
+  const api = bridge();
+  try {
+    const u =
+      api?.initDataUnsafe?.user ||
+      api?.user ||
+      (typeof window !== 'undefined' ? window.maxUser : null);
+    if (!u) return null;
+    const name = u.first_name || u.name || u.username || u.displayName || null;
+    const avatar = u.photo_url || u.avatar_url || u.avatar || u.photo || null;
+    return { name, avatar };
+  } catch {
+    return null;
+  }
+}
+
 // Сообщаем MAX, что приложение готово и хочет занять весь экран.
 export function notifyReady() {
   const api = bridge();

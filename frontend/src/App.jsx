@@ -11,14 +11,15 @@ import ResultsScreen from './screens/ResultsScreen.jsx';
 import PlaceScreen from './screens/PlaceScreen.jsx';
 import RouteScreen from './screens/RouteScreen.jsx';
 import CustomChainScreen from './screens/CustomChainScreen.jsx';
+import ProfileScreen from './screens/ProfileScreen.jsx';
 import NoFitScreen from './screens/NoFitScreen.jsx';
 import EditSheet from './screens/EditSheet.jsx';
 import HistoryScreen from './screens/HistoryScreen.jsx';
 
 import { CITY, HISTORY } from './data/places.js';
 import { rankPlaces } from './lib/planner.js';
-import { searchRemote } from './lib/api.js';
-import { detectColorScheme, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
+import { fetchProfile, saveTripRemote, searchRemote } from './lib/api.js';
+import { detectColorScheme, getUser, notifyReady, onColorSchemeChange } from './lib/maxBridge.js';
 import { formatDate } from './lib/format.js';
 
 const DEFAULT_MINUTES = 120;
@@ -43,6 +44,9 @@ export default function App() {
   const [mode, setMode] = useState('single');
   const [startAt, setStartAt] = useState(() => new Date());
   const [history, setHistory] = useState(HISTORY);
+  // Профиль: пользователь из MAX (имя/аватар) + данные из БД (статистика, история).
+  const [user, setUser] = useState(() => getUser());
+  const [profile, setProfile] = useState(null);
   // «Мой маршрут» — места, которые пользователь сам собрал в цепочку.
   const [customChain, setCustomChain] = useState([]);
 
@@ -82,8 +86,17 @@ export default function App() {
 
   useEffect(() => {
     notifyReady();
+    // MAX может отдать пользователя чуть позже готовности — перечитываем.
+    setUser(getUser());
     return onColorSchemeChange(setScheme);
   }, []);
+
+  // Открыть профиль: тянем свежие данные из БД (статистика + просмотренные маршруты).
+  const openProfile = useCallback(() => {
+    setUser((u) => getUser() || u);
+    go('profile');
+    fetchProfile().then((data) => data && setProfile(data));
+  }, [go]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = scheme;
@@ -157,7 +170,18 @@ export default function App() {
         ...list,
       ];
     });
-  }, []);
+    // Пишем в БД (история профиля). Имя места передаём явно — для мест 2ГИС.
+    saveTripRemote({
+      placeId: place.id,
+      place: place.name,
+      minutes: place.eval.total,
+      walkTo: place.walkTo,
+      visit: place.eval.visit,
+      walkBack: place.walkBack,
+      interests: place.interests,
+      start,
+    });
+  }, [start]);
 
   const openRoute = useCallback(
     (place) => {
@@ -354,6 +378,16 @@ export default function App() {
           />
         );
 
+      case 'profile':
+        return (
+          <ProfileScreen
+            profile={profile}
+            user={user}
+            onBack={back}
+            onOpen={repeatTrip}
+          />
+        );
+
       case 'location':
       default:
         return (
@@ -369,7 +403,8 @@ export default function App() {
               go('time');
             }}
             onAddress={() => go('address')}
-            onHistory={() => go('history')}
+            user={user}
+            onProfile={openProfile}
           />
         );
     }
