@@ -91,7 +91,7 @@ export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild
       <div className="mt-16">
         <Button onClick={onBuild}>
           <Icon name="route" size={19} />
-          {built ? 'Маршрут сохранён' : 'Построить маршрут'}
+          {built ? 'Маршрут построен' : 'Построить маршрут'}
         </Button>
         <Button variant="secondary" onClick={onOpen}>
           <Icon name="external" size={19} />

@@ -112,9 +112,12 @@ export default function PlaceScreen({ place, minutes, chain, inMyChain, onToggle
 
         <div className="spacer" style={{ minHeight: 20 }} />
 
-        <Button onClick={onRoute} style={{ height: 60, fontSize: 18 }}>Построить маршрут</Button>
-        <Button variant="secondary" onClick={onToggleMyChain} style={{ height: 60, fontSize: 17 }}>
-          <Icon name={inMyChain ? 'check' : 'route'} size={20} />
+        <Button onClick={onRoute}>
+          <Icon name="route" size={19} />
+          Построить маршрут
+        </Button>
+        <Button variant="secondary" onClick={onToggleMyChain}>
+          <Icon name={inMyChain ? 'check' : 'route'} size={19} />
           {inMyChain ? 'В моём маршруте' : 'В мой маршрут'}
         </Button>
         {/* Запас прокрутки снизу, чтобы кнопки не липли к краю экрана. */}
