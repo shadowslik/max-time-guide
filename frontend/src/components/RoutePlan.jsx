@@ -81,18 +81,12 @@ export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild
         </Badge>
       </div>
 
-      {/* Таймлайн занимает всю высоту и прокручивается вместе со шторкой. */}
+      {/* Обычный поток: контент прокручивается вместе со шторкой, как в «Одно место». */}
       <div className="mt-16">
         <Timeline items={items} />
       </div>
 
-      {/* Кнопки закреплены снизу: список над ними прокручивается. */}
-      <div
-        style={{
-          position: 'sticky', bottom: 0, marginTop: 12, paddingTop: 10,
-          background: 'var(--surface)',
-        }}
-      >
+      <div className="mt-16">
         <Button onClick={onBuild}>
           <Icon name="route" size={19} />
           {built ? 'Маршрут сохранён' : 'Построить маршрут'}
