@@ -12,6 +12,7 @@ import logging
 import math
 import threading
 import time
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 import httpx
@@ -243,10 +244,89 @@ def _visit_time_by_interests(ints) -> tuple:
     return 30, 15
 
 
+_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+
+
+def _hm(s: str) -> Optional[int]:
+    """'08:00' → минуты от полуночи. '24:00' → 1440."""
+    try:
+        h, m = s.split(":")
+        return int(h) * 60 + int(m)
+    except (ValueError, AttributeError):
+        return None
+
+
+def _now_local() -> datetime:
+    # Контейнер обычно в UTC; берём московское время (+3) как разумный дефолт для РФ.
+    return datetime.utcnow() + timedelta(hours=3)
+
+
+def _is_open(schedule: dict, when: datetime) -> Optional[bool]:
+    """Открыто ли место в момент when. None — расписания нет / не разобрать
+    (тогда место не прячем: у парков и памятников часов обычно нет)."""
+    if not isinstance(schedule, dict) or not schedule:
+        return None
+    if schedule.get("is_24x7") or schedule.get("24x7"):
+        return True
+
+    now = when.hour * 60 + when.minute
+    today = _DAYS[when.weekday()]
+    yday = _DAYS[(when.weekday() - 1) % 7]
+
+    def intervals(day_key):
+        day = schedule.get(day_key)
+        if not isinstance(day, dict):
+            return []
+        return day.get("working_hours") or []
+
+    checked = False
+    for iv in intervals(today):
+        a, b = _hm(iv.get("from")), _hm(iv.get("to"))
+        if a is None or b is None:
+            continue
+        checked = True
+        if b > a:  # обычный интервал в пределах суток
+            if a <= now < b:
+                return True
+        else:  # переваливает за полночь (напр. 12:00–02:00)
+            if now >= a:
+                return True
+    # интервал вчерашнего дня, заходящий за полночь в сегодня
+    for iv in intervals(yday):
+        a, b = _hm(iv.get("from")), _hm(iv.get("to"))
+        if a is None or b is None:
+            continue
+        checked = True
+        if b <= a and now < b:  # вчера 12:00–02:00 → сегодня 00:00–02:00
+            return True
+
+    return False if checked else None
+
+
+def _today_hours(schedule: dict, when: datetime) -> str:
+    """Строка часов на сегодня для карточки, напр. '08:00–21:00'."""
+    if not isinstance(schedule, dict):
+        return ""
+    day = schedule.get(_DAYS[when.weekday()])
+    if not isinstance(day, dict):
+        return ""
+    parts = []
+    for iv in day.get("working_hours") or []:
+        f, t = iv.get("from"), iv.get("to")
+        if f and t:
+            parts.append(f"{f}–{t}")
+    return ", ".join(parts)
+
+
 def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> Optional[List[dict]]:
-    """Места из 2ГИС по категориям и радиусу (основной источник). None — ключ не задан."""
+    """Места из 2ГИС по категориям и радиусу (основной источник). None — ключ не задан.
+
+    Закрытые сейчас места не показываем; у кого расписания нет (парки/памятники) —
+    оставляем.
+    """
     if not TWOGIS_KEY:
         return None
+    now = _now_local()
 
     ids = [i for i in (interests or []) if i in TWOGIS_QUERIES] or list(TWOGIS_QUERIES)
     # Запрос → интересы, которые его породили (музей относится к art и culture).
@@ -269,7 +349,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                 "page_size": min(per_query, 10),  # 2ГИС: допустимо 1..10
                 # branch — организации (музеи/кафе/театры), attraction — парки/памятники/смотровые
                 "type": "branch,attraction",
-                "fields": "items.point,items.address_name,items.full_name,items.rubrics,items.reviews",
+                "fields": "items.point,items.address_name,items.full_name,items.rubrics,items.reviews,items.schedule",
                 "key": TWOGIS_KEY,
             }
             try:
@@ -293,6 +373,10 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                     rec = by_id[oid]
                     rec["interests"] = list(dict.fromkeys(rec["interests"] + list(q_ints)))
                     continue
+                # Закрытые сейчас места не показываем (у кого расписания нет — оставляем).
+                schedule = it.get("schedule")
+                if _is_open(schedule, now) is False:
+                    continue
                 ideal, mn = _visit_time_by_interests(q_ints)
                 rubric = next((rb.get("name") for rb in (it.get("rubrics") or []) if rb.get("name")), "")
                 reviews = it.get("reviews") or {}
@@ -303,7 +387,7 @@ def fetch_2gis_places(start, interests, minutes=120, per_query=10, limit=80) -> 
                     "interests": list(q_ints),
                     "price": "уточняйте",
                     "priceNote": "",
-                    "hours": "",
+                    "hours": _today_hours(schedule, now),
                     "blurb": it.get("full_name") or it.get("address_name") or "",
                     "highlights": [rubric] if rubric else [],
                     "coords": [float(plon), float(plat)],
