@@ -1,26 +1,16 @@
-168.113.157.47.sslip.io {
-    encode gzip
+# Адрес берётся из переменной SITE_ADDRESS (передаёт docker-compose).
+# Локально по умолчанию :80 — Caddy отвечает на ЛЮБОЙ хост (localhost, 127.0.0.1,
+# IP машины) по HTTP, без сертификатов.
+# На сервере задай в .env домен
+# Caddy сам получит HTTPS-сертификат Let's Encrypt.
+{$SITE_ADDRESS::80} {
+	encode gzip
 
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
+	handle /api/* {
+		reverse_proxy backend:8000
+	}
 
-    handle {
-        reverse_proxy frontend:80
-    }
-}
-
-# Локальный запуск тем же `docker compose up`: открывать http://localhost
-# (по HTTP, без сертификатов). Тот же роутинг, что и на сервере: /api → бэкенд,
-# остальное → статика фронта. На боевом сервере этот блок безвреден.
-http://localhost, http://127.0.0.1 {
-    encode gzip
-
-    handle /api/* {
-        reverse_proxy backend:8000
-    }
-
-    handle {
-        reverse_proxy frontend:80
-    }
+	handle {
+		reverse_proxy frontend:80
+	}
 }

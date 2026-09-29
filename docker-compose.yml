@@ -6,6 +6,10 @@ services:
     ports:
       - "80:80"
       - "443:443"
+    # Локально по умолчанию http://localhost (без сертификатов). На сервере
+    # задаётся домен в .env (SITE_ADDRESS=...) → Caddy включает авто-HTTPS.
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
