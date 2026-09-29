@@ -47,18 +47,20 @@ def _connect() -> sqlite3.Connection:
 
 
 def conn() -> sqlite3.Connection:
+    # Ленивая инициализация. Вызывается уже под _LOCK (из execute/query), поэтому
+    # сам лок здесь НЕ берём — иначе повторный захват нереентрабельного лока
+    # приводит к вечному зависанию на первом обращении к БД.
     global _CONN
     if _CONN is None:
-        with _LOCK:
-            if _CONN is None:
-                _CONN = _connect()
+        _CONN = _connect()
     return _CONN
 
 
 def execute(sql: str, params: tuple = ()):
     with _LOCK:
-        cur = conn().execute(sql, params)
-        conn().commit()
+        c = conn()
+        cur = c.execute(sql, params)
+        c.commit()
         return cur
 
 

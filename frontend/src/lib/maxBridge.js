@@ -37,32 +37,66 @@ export function onColorSchemeChange(handler) {
   return () => cleanups.forEach((fn) => fn());
 }
 
+// initData может лежать не только в объекте SDK, но и в URL запуска мини-аппа
+// (MAX/Telegram кладут его в hash или query). Проверяем все известные ключи.
+function initDataFromUrl() {
+  if (typeof window === 'undefined') return '';
+  try {
+    const parts = [window.location.hash.slice(1), window.location.search.slice(1)];
+    for (const raw of parts) {
+      if (!raw) continue;
+      const p = new URLSearchParams(raw);
+      for (const key of ['initData', 'tgWebAppData', 'webAppData', 'web_app_data', 'max_web_app_data']) {
+        const v = p.get(key);
+        if (v) return v;
+      }
+    }
+  } catch {
+    /* нет доступа к URL — не страшно */
+  }
+  return '';
+}
+
 // initData — строка авторизации MAX (для запросов к бэкенду). Вне MAX пусто.
 export function getInitData() {
   const api = bridge();
   try {
-    return api?.initData || '';
+    if (api?.initData) return api.initData;
+    if (window.Telegram?.WebApp?.initData) return window.Telegram.WebApp.initData;
   } catch {
-    return '';
+    /* продолжаем к URL */
+  }
+  return initDataFromUrl();
+}
+
+function userFromInitData(initData) {
+  try {
+    const raw = new URLSearchParams(initData).get('user');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 }
 
 // Данные пользователя MAX: имя и аватар. Разные версии кладут их по-разному,
-// поэтому проверяем несколько путей; вне MAX — null.
+// поэтому проверяем объект SDK, Telegram-совместимый мост и саму initData.
 export function getUser() {
   const api = bridge();
+  let u = null;
   try {
-    const u =
+    u =
       api?.initDataUnsafe?.user ||
       api?.user ||
+      window.Telegram?.WebApp?.initDataUnsafe?.user ||
       (typeof window !== 'undefined' ? window.maxUser : null);
-    if (!u) return null;
-    const name = u.first_name || u.name || u.username || u.displayName || null;
-    const avatar = u.photo_url || u.avatar_url || u.avatar || u.photo || null;
-    return { name, avatar };
   } catch {
-    return null;
+    /* пробуем из initData ниже */
   }
+  if (!u) u = userFromInitData(getInitData());
+  if (!u) return null;
+  const name = u.first_name || u.name || u.username || u.displayName || null;
+  const avatar = u.photo_url || u.avatar_url || u.avatar || u.photo || null;
+  return { name, avatar };
 }
 
 // Сообщаем MAX, что приложение готово и хочет занять весь экран.
