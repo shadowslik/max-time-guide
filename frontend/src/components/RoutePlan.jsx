@@ -58,8 +58,9 @@ export function computeRoutePlan(places, start, minutes, startAt) {
   return { timeline, points, markers, total, over, fits };
 }
 
-// Панель одной вкладки-маршрута: заголовок, таймлайн (с удалением), кнопка.
-export function RoutePlanPanel({ plan, places, minutes, onRemove, onOpen, emptyHint }) {
+// Панель одной вкладки-маршрута: заголовок, таймлайн (с удалением) во всю высоту
+// и «липкие» кнопки снизу. «Построить маршрут» — строит и сохраняет по нажатию.
+export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild, onOpen, emptyHint }) {
   if (!places.length) {
     return <p className="lead" style={{ marginTop: 14 }}>{emptyHint}</p>;
   }
@@ -80,16 +81,27 @@ export function RoutePlanPanel({ plan, places, minutes, onRemove, onOpen, emptyH
         </Badge>
       </div>
 
-      <div className="mt-16" style={{ maxHeight: 260, overflowY: 'auto', margin: '16px -4px 0', padding: '0 4px' }}>
+      {/* Таймлайн занимает всю высоту и прокручивается вместе со шторкой. */}
+      <div className="mt-16">
         <Timeline items={items} />
       </div>
 
-      <div className="spacer" style={{ minHeight: 12 }} />
-
-      <Button onClick={onOpen}>
-        <Icon name="external" size={19} />
-        Открыть маршрут
-      </Button>
+      {/* Кнопки закреплены снизу: список над ними прокручивается. */}
+      <div
+        style={{
+          position: 'sticky', bottom: 0, marginTop: 12, paddingTop: 10,
+          background: 'var(--surface)',
+        }}
+      >
+        <Button onClick={onBuild}>
+          <Icon name="route" size={19} />
+          {built ? 'Маршрут сохранён' : 'Построить маршрут'}
+        </Button>
+        <Button variant="secondary" onClick={onOpen}>
+          <Icon name="external" size={19} />
+          Открыть в картах
+        </Button>
+      </div>
     </>
   );
 }

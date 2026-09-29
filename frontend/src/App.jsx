@@ -292,6 +292,7 @@ export default function App() {
             inMy={inChain}
             onToggleMy={toggleChain}
             onRemoveMy={removeFromChain}
+            onSaveRoute={(places) => places.forEach(saveTrip)}
             onRoute={() => selected && openRoute(selected)}
             onEdit={() => setSheet('edit')}
             onMode={setMode}

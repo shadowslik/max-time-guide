@@ -5,10 +5,9 @@ import MapPin from './MapPin.jsx';
 
 function Mark({ item }) {
   if (item.type === 'start') return <span className="timeline__mark" />;
+  // Финиш («На месте») — такой же пин, как остановки, чтобы всё смотрелось ровно.
   if (item.type === 'finish') {
-    // Чистый кружок без иконки. Зелёный — успеваешь, оранжевый — нет.
-    const bg = item.tone === 'warn' ? 'var(--warn-text)' : 'var(--ok-text)';
-    return <span className="timeline__mark timeline__mark--finish" style={{ background: bg }} />;
+    return <MapPin tone={item.tone === 'warn' ? 'warn' : 'ok'} size={18} />;
   }
   return <MapPin tone="ok" size={18} number={item.number} />;
 }

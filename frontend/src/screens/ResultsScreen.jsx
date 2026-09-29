@@ -116,7 +116,7 @@ function SinglePanel({ minutes, selected, others, onSelect, onOpenPlace, onRoute
 export default function ResultsScreen({
   theme, start, origin, minutes, interests, results, selected, chain, chains = [], mode, startAt,
   onSelect, onOpenPlace, onMarkerOpen, onRoute, onEdit, onBack, onMode,
-  myList = [], inMy, onToggleMy, onRemoveMy,
+  myList = [], inMy, onToggleMy, onRemoveMy, onSaveRoute,
 }) {
   // Варианты автоцепочки (когда времени не хватило на все интересы).
   const variants = chains.length ? chains : chain ? [chain] : [];
@@ -146,22 +146,23 @@ export default function ResultsScreen({
   };
   const others = results.filter((place) => place.id !== selected?.id);
 
-  // Геометрия линии маршрута для активной вкладки-маршрута.
+  // Линию маршрута строим НЕ сразу, а по кнопке «Построить маршрут». При смене
+  // вкладки/состава мест сбрасываем — чтобы старая геометрия не висела.
   const [routeLine, setRouteLine] = useState(null);
+  const [built, setBuilt] = useState(false);
   const routeKey = routeMode ? activeList.map((p) => p.id).join() : '';
   useEffect(() => {
-    if (!routeMode || activeList.length < 1) {
-      setRouteLine(null);
-      return undefined;
-    }
-    const pts = plan.points;
-    setRouteLine(pts);
-    let alive = true;
-    fetchRouteDetails(pts).then((d) => {
-      if (alive && d) setRouteLine(d.line);
-    });
-    return () => { alive = false; };
-  }, [routeMode, routeKey]); // eslint-disable-line react-hooks/exhaustive-deps
+    setRouteLine(null);
+    setBuilt(false);
+  }, [routeKey, mode]);
+
+  const buildRoute = () => {
+    if (activeList.length < 1) return;
+    setBuilt(true);
+    setRouteLine(plan.points); // сразу прямая, реальную геометрию подменит роутер
+    fetchRouteDetails(plan.points).then((d) => d && setRouteLine(d.line));
+    onSaveRoute?.(activeList); // сохраняем в «Мои маршруты» (профиль)
+  };
 
   const markers = routeMode
     ? plan.markers
@@ -298,6 +299,8 @@ export default function ResultsScreen({
                 plan={plan}
                 places={activeList}
                 minutes={minutes}
+                built={built}
+                onBuild={buildRoute}
                 onRemove={removeFromActive}
                 onOpen={() => openExternal(externalRouteUrl(plan.points))}
                 emptyHint={
