@@ -139,6 +139,11 @@ export default function ResultsScreen({
 
   const found = results.length;
   const fits = results.filter((p) => p.eval.status !== 'no').length;
+  // Сколько мест реально успеть ОДНИМ маршрутом за это время — длина самой
+  // длинной цепочки (в 11 мест за 3 часа не успеть, даже если каждое достижимо
+  // по отдельности). Если цепочку не собрать — успеваешь хотя бы одно место.
+  const maxChain = variants.reduce((m, v) => Math.max(m, v.legs.length), 0);
+  const reachable = maxChain || (fits ? 1 : 0);
   const counts = {
     ok: results.filter((p) => p.eval.status === 'fits').length,
     warn: results.filter((p) => p.eval.status === 'tight').length,
@@ -220,7 +225,7 @@ export default function ResultsScreen({
             <div className="banner drop" style={{ position: 'absolute', left: 16, top: 80, animationDelay: '70ms' }}>
               <span className="dot" style={{ background: 'var(--ok)' }} />
               <span>
-                {fits} из {plural(found, 'места', 'мест', 'мест')} успеваешь за {formatBudget(minutes)}
+                Успеешь {reachable} из {plural(found, 'места', 'мест', 'мест')} за {formatBudget(minutes)}
               </span>
             </div>
 

@@ -77,7 +77,7 @@ export function RoutePlanPanel({ plan, places, minutes, built, onRemove, onBuild
       <div className="row mt-4">
         <h2 className="title-m grow">
           {plan.fits
-            ? `Успеешь ${places.length} ${plural(places.length, 'место', 'места', 'мест')} за ${minutes} мин`
+            ? `Успеешь ${plural(places.length, 'место', 'места', 'мест')} за ${minutes} мин`
             : 'Не помещается в бюджет'}
         </h2>
         <Badge tone={plan.fits ? 'ok' : 'warn'}>
