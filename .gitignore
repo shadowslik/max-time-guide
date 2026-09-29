@@ -25,6 +25,5 @@ build/
 
 .idea/
 .vscode/
-.claude/
 .DS_Store
 *.log
