@@ -45,6 +45,11 @@ export default function PlaceScreen({ place, minutes, chain, inMyChain, onToggle
               <span style={{ color: 'var(--text-3)', fontWeight: 400 }}> · {place.reviewCount} отзывов</span>
             </span>
           )}
+          {hasHours && (
+            <span style={{ color: 'var(--ok-text)', fontWeight: 650 }}>
+              Открыто<span style={{ color: 'var(--text-3)', fontWeight: 400 }}> · сегодня {place.hours}</span>
+            </span>
+          )}
         </div>
 
         {place.blurb && (
